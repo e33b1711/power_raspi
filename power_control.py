@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
+import serial_arduino
+
+import threading
+
 from pymodbus.client.sync import ModbusSerialClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
-
-import serial
-import io
-ser = serial.serial_for_url('/dev/ttyUSB1', timeout=0.5)
-sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
-
 
 
 
@@ -68,37 +66,21 @@ def connect_mqtt():
     client.connect(broker, port)
     return client
     
-def publish(client):
-
-         msg = str((sdm630_values[0] + sdm630_values[1] + sdm630_values[2])/3)
-         result = client.publish(topic, msg)
-         # result: [0, 1]
-         status = result[0]
-         if status == 0:
-             print(f"Send `{msg}` to topic `{topic}`")
-         else:
-             print(f"Failed to send message to topic {topic}")
-             
-             
-def handle_arduino():
-    sio.write("pwm_setpoint:100\n")
-    sio.flusch();
-    line="1"
-    while line:
-        line = sio.readline()
-        print(line)
 
 
 if __name__ == "__main__":
 
-    client = connect_mqtt()
+    #client = connect_mqtt()
     client.loop_start()
     
+    thread = threading.Thread(target=read_loop)
+    thread.start()
+    
     while 1:
-        run_sync_client()
-        publish(client)
-        handle_arduino()        
-        time.sleep(5)
+        #run_sync_client()
+        #publish(client)
+        pwm_setpoint(100)
+        time.sleep(20)
         
         
         
