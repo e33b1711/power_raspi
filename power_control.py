@@ -4,6 +4,9 @@ from pymodbus.client.sync import ModbusSerialClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
+import serial
+    ser = serial.Serial(port='/dev/ttyUSB1',baudrate=115200)
+
 
 
 from paho.mqtt import client as mqtt_client
@@ -72,6 +75,13 @@ def publish(client):
              print(f"Send `{msg}` to topic `{topic}`")
          else:
              print(f"Failed to send message to topic {topic}")
+             
+             
+def handle_arduino():
+    line = ser.readline();
+    if line:
+        print(line)
+    ser.close()
 
 
 if __name__ == "__main__":
