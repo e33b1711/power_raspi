@@ -16,9 +16,9 @@ def read_loop():
     print("Starting read_loop")
     while 1:
         line = sio.readline()
-        for key in arduino_keys:
-            value = line.get(key,None)
-            if value is not None: #if it exists you can use it
+        key, val = line.split("=")
+        for test_key in arduino_keys:
+            if value is test_key : #if it exists you can use it
                 print(key + " has value: " + value)
 
 
