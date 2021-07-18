@@ -5,7 +5,7 @@ sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
 arduino_keys = ["powerUtility", "powerPV", "powerHeat", "pwm_setpoint", "tempHigh", "tempLow"]
 
 
-def pwm_setpoint(val)
+def pwm_setpoint(val):
     print("pwm_setpoint...")
     assert(val>=0 and val<=255)
     sio.write("pwm_setpoint:" + str(val))
@@ -14,10 +14,10 @@ def pwm_setpoint(val)
              
 def read_loop(): 
     print("Starting read_loop")
-    while true:
+    while 1:
         line = sio.readline()
         for key in arduino_keys:
-            value = input_dict.get(key,None)
+            value = line.get(key,None)
             if value is not None: #if it exists you can use it
                 print(key + " has value: " + value)
 

@@ -71,9 +71,9 @@ def connect_mqtt():
 if __name__ == "__main__":
 
     #client = connect_mqtt()
-    client.loop_start()
+    #client.loop_start()
     
-    thread = threading.Thread(target=read_loop)
+    thread = threading.Thread(target=serial_arduino.read_loop)
     thread.start()
     
     while 1:
