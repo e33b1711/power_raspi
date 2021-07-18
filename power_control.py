@@ -70,17 +70,18 @@ def connect_mqtt():
 
 if __name__ == "__main__":
 
-    #client = connect_mqtt()
-    #client.loop_start()
+    client = connect_mqtt()
+    client.loop_start()
     
     thread = threading.Thread(target=serial_arduino.read_loop)
     thread.start()
     
     while 1:
-        #run_sync_client()
-        #publish(client)
-        pwm_setpoint(100)
-        time.sleep(20)
+        serial_arduino.print_values()
+        run_sync_client()
+        publish(client)
+        serial_arduino.pwm_setpoint(0)
+        time.sleep(5)
         
         
         
