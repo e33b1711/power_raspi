@@ -7,10 +7,10 @@ from pymodbus.payload import BinaryPayloadDecoder
 
 
 from paho.mqtt import client as mqtt_client
-broker = 'openhabianpi.fritz.box'
+broker = 'openhabianpi2.fritz.box'
 port = 1883
 topic = "power_control/powerBal"
-
+client_id = "raspi_power"
 
 
 import logging
@@ -57,14 +57,14 @@ def connect_mqtt():
             print("Failed to connect, return code %d\n", rc)
     # Set Connecting Client ID
     client = mqtt_client.Client(client_id)
-    client.username_pw_set(username, password)
+    #client.username_pw_set(username, password)
     client.on_connect = on_connect
     client.connect(broker, port)
     return client
     
 def publish(client):
 
-         msg = str((sdm630_values[0] + sdm630_values[1] + sdm630_values[2])/3])
+         msg = str((sdm630_values[0] + sdm630_values[1] + sdm630_values[2])/3)
          result = client.publish(topic, msg)
          # result: [0, 1]
          status = result[0]
@@ -72,7 +72,6 @@ def publish(client):
              print(f"Send `{msg}` to topic `{topic}`")
          else:
              print(f"Failed to send message to topic {topic}")
-         msg_count += 1
 
 
 if __name__ == "__main__":
