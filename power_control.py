@@ -5,6 +5,9 @@ from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
 import serial
+import io
+ser = serial.serial_for_url('/dev/ttyUSB1', timeout=0.5)
+sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
 
 
 
@@ -78,20 +81,12 @@ def publish(client):
              
              
 def handle_arduino():
-    ser = serial.Serial()
-    ser.baudrate = 9600
-    ser.parity = 'N'
-    ser.bytesize = 8
-    ser.stopbits = 1
-    ser.port = '/dev/ttyUSB1'
-    ser.timeout=0.1
-    while 1:
-        line = ser.readline()
+    sio.write("pwm_setpoint:100\n")
+    sio.flusch();
+    line="1"
+    while line:
+        line = sio.readline()
         print(line)
-        if not(line):
-            break
-    ser.write(b'pwm_out:100\n')
-    ser.close()
 
 
 if __name__ == "__main__":
