@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import serial_arduino
+import mqtt_oh
 
 import threading
 
@@ -8,13 +9,6 @@ from pymodbus.client.sync import ModbusSerialClient as ModbusClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
-
-
-from paho.mqtt import client as mqtt_client
-broker = 'openhabianpi2.fritz.box'
-port = 1883
-topic = "power_control/powerBal"
-client_id = "raspi_power"
 
 
 import logging
@@ -32,6 +26,8 @@ import time
 sdm630_info         = ["p1_power", "p2_power", "p3_power"]
 sdm630_addresses    = [ 0x0C, 0x0E, 0x10]
 sdm630_values       = [0, 0, 0]
+
+             
 
 
 def run_sync_client():
@@ -53,18 +49,7 @@ def run_sync_client():
     client.close()
     
     
-def connect_mqtt():
-    def on_connect(client, userdata, flags, rc):
-        if rc == 0:
-            print("Connected to MQTT Broker!")
-        else:
-            print("Failed to connect, return code %d\n", rc)
-    # Set Connecting Client ID
-    client = mqtt_client.Client(client_id)
-    #client.username_pw_set(username, password)
-    client.on_connect = on_connect
-    client.connect(broker, port)
-    return client
+
     
 
 
@@ -79,8 +64,12 @@ if __name__ == "__main__":
     while 1:
         serial_arduino.print_values()
         run_sync_client()
-        publish(client)
-        serial_arduino.pwm_setpoint(0)
+        
+        for key in serial_arduino.keys:
+            publish(client, "power_control/" + key, str(serial_arduino.arduino_values[key]))
+            
+        publish(client, "power_control/balPower", str(sdm630_values[0] + sdm630_values[1] + sdm630_values[2]))   
+        serial_arduino.pwm_setpoint(10)
         time.sleep(5)
         
         
