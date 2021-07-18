@@ -5,7 +5,13 @@ from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
 import serial
-    ser = serial.Serial(port='/dev/ttyUSB1',baudrate=115200)
+ser = serial.Serial()
+ser.baudrate = 9600
+ser.parity = 'N'
+ser.bytesize = 8
+ser.stopbits = 1
+ser.port = '/dev/ttyUSB1'
+ser.timeout=0.1
 
 
 
@@ -78,9 +84,13 @@ def publish(client):
              
              
 def handle_arduino():
-    line = ser.readline();
-    if line:
+    ser.open();
+    while 1:
+        line = ser.readline()
         print(line)
+        if not(line):
+            break
+    ser.write(b'pwm_out:100\n')
     ser.close()
 
 
@@ -92,9 +102,8 @@ if __name__ == "__main__":
     while 1:
         run_sync_client()
         publish(client)
-        time.sleep(10)
-        
-        
+        handle_arduino()        
+        time.sleep(5)
         
         
         
