@@ -7,11 +7,15 @@ values ={}
 
 
 def pwm_setpoint(val):
-    print("pwm_setpoint...")
-    assert(val>=0 and val<=255)
-    sio.write("pwm_setpoint:" + str(val) + "\n")
-    sio.flush();
-        
+    print("pwm_setpoint: " + str(val))
+    val = round(val)
+    if val<0:
+        val=0
+    if val >255:
+        val=255
+    sio.write("setpoint_pwm:" + str(val) + "\n")
+    sio.flush()
+    print("setpoint_pwm:" + str(val) + "\n")        
 
 def print_values():
     print(values)

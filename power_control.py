@@ -54,11 +54,23 @@ if __name__ == "__main__":
     info_thread = threading.Thread(target=info_loop)
     info_thread.start()
     
+    values["setpoint_heat"] = 0.0
+
+    time.sleep(2)
+
     while 1:
         #control algorithm
-        time.sleep(1)
         update_values()
-        values["setpoint_heat"] = 100;
+        time.sleep(1)
+        #print("is: "+ str(values["setpoint_heat"]))
+        update = values["setpoint_heat"] - 0.01*(values["power_bal"]+25.0)
+        #print("update 0: " +str(update))
+        if update >255:
+            update = 255
+        if update < 0:
+            update = 0
+        values["setpoint_heat"] = update
+        #print("update:" + str(update))
         serial_arduino.pwm_setpoint(values["setpoint_heat"])
         
         
