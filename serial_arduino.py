@@ -2,8 +2,8 @@ import serial
 import io
 ser = serial.serial_for_url('/dev/ttyUSB1', timeout=0.5)
 sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
-arduino_keys = {"powerPV", "powerHeat", "pwm_setpoint", "tempHigh", "tempLow"}
-arduino_values ={}
+keys = {"power_pv", "power_heat", "pwm_setpoint", "temp_high", "temp_low"}
+values ={}
 
 
 def pwm_setpoint(val):
@@ -14,12 +14,12 @@ def pwm_setpoint(val):
         
 
 def print_values():
-    print(arduino_values)
+    print(values)
              
 def read_loop(): 
     print("Starting read_loop")
-    for test_key in arduino_keys:
-        arduino_values[test_key] = -10.0
+    for test_key in keys:
+        values[test_key] = -10.0
     while 1:
         line = sio.readline()
         try:
@@ -28,7 +28,7 @@ def read_loop():
             for test_key in arduino_keys:
                 if key == test_key : #if it exists you can use it
                     #print("matcH: "+ key)
-                    arduino_values[test_key] = float(val) 
+                    values[test_key] = float(val) 
                     #print(key + " " + val)
                 #else:
                     #print("mismatch: " + key)

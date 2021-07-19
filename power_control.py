@@ -2,55 +2,45 @@
 
 import serial_arduino
 import mqtt_oh
+import modbus_sdm630
 
 import threading
-
-from pymodbus.client.sync import ModbusSerialClient as ModbusClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadDecoder
-
-
-
-import logging
-FORMAT = ('%(asctime)-15s %(threadName)-15s '
-          '%(levelname)-8s %(module)-15s:%(lineno)-8s %(message)s')
-logging.basicConfig(format=FORMAT)
-log = logging.getLogger()
-log.setLevel(logging.DEBUG)
-
-UNIT = 0x1
-
 import time
+from datetime import datetime
+now = datetime.now()
 
 
-sdm630_info         = ["p1_power", "p2_power", "p3_power"]
-sdm630_addresses    = [ 0x0C, 0x0E, 0x10]
-sdm630_values       = [0, 0, 0]
 
+keys    = {"bal_power"}
+values  = 
+
+def update_values()
+    #calculate auxilary values
+    values[keys[1]] = modbus_sdm630.vales["p1_power"] + modbus_sdm630.vales["p2_power"] + modbus_sdm630.vales["p3_power"]
+    
              
-
-
-def run_sync_client():
-
-    client = ModbusClient(method='rtu', port='/dev/ttyUSB0', timeout=1, baudrate=9600)
-    client.connect()
-
-    
-    for index in range(len(sdm630_info)):
-        result =  client.read_input_registers(address=sdm630_addresses[index], count=2, unit=1)
-    
-        if result.isError():
-            log.debug("Error reading " + sdm630_info[index])
-        else:
-            decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
-            sdm630_values[index] = decoder.decode_32bit_float()
-            print(sdm630_info[index] + ": " + str(sdm630_values[index]))
-
-    client.close()
+def print_values():
+    print(values)
     
     
-
+def info_loop()
+    client = mqtt_oh.connect_mqtt()
+    client.loop_start()
+    while 1:
+        time.sleep(5)
+        for key in serial_arduino.keys:
+            mqtt_oh.publish(client, "power_control/" + key, str(serial_arduino.arduino_values[key]))
+        for key in modbus_sdm630.keys:
+            mqtt_oh.publish(client, "power_control/" + key, str(modbus_sdm630.values[key]))  
+        for key in keys:
+            mqtt_oh.publish(client, "power_control/" + key, str(values[key])) 
+        serial_arduino.print_values()
+        modbus_sdm630.print_values()
+        print_values()
     
+
+
+
 
 
 if __name__ == "__main__":
@@ -58,19 +48,20 @@ if __name__ == "__main__":
     client = connect_mqtt()
     client.loop_start()
     
-    thread = threading.Thread(target=serial_arduino.read_loop)
-    thread.start()
+    serial_thread = threading.Thread(target=serial_arduino.read_loop)
+    serial_thread.start()
+    
+    sdm_thread = threading.Thread(target=modbus_sdm630.sync_loop)
+    sdm_thread.start()
+    
+    info_thread = threading.Thread(target=info_loop)
+    info_thread.start()
     
     while 1:
-        serial_arduino.print_values()
-        run_sync_client()
-        
-        for key in serial_arduino.keys:
-            publish(client, "power_control/" + key, str(serial_arduino.arduino_values[key]))
-            
-        publish(client, "power_control/balPower", str(sdm630_values[0] + sdm630_values[1] + sdm630_values[2]))   
-        serial_arduino.pwm_setpoint(10)
-        time.sleep(5)
+        #control algorithm
+        values["set_point"] = 100;
+        serial_arduino.pwm_setpoint(values["set_point"])
+        time.sleep(1)
         
         
         
