@@ -11,32 +11,32 @@ now = datetime.now()
 
 
 
-keys    = {"bal_power"}
-values  = 
+keys    = {"power_bal", "setpoint_heat"}
+values  = {}
 
-def update_values()
+def update_values():
     #calculate auxilary values
-    values[keys[1]] = modbus_sdm630.vales["p1_power"] + modbus_sdm630.vales["p2_power"] + modbus_sdm630.vales["p3_power"]
+    values["power_bal"] = modbus_sdm630.values["power_p1"] + modbus_sdm630.values["power_p2"] + modbus_sdm630.values["power_p3"]
     
              
 def print_values():
     print(values)
     
     
-def info_loop()
+def info_loop():
     client = mqtt_oh.connect_mqtt()
     client.loop_start()
     while 1:
         time.sleep(5)
+        serial_arduino.print_values()
+        modbus_sdm630.print_values()
+        print_values()
         for key in serial_arduino.keys:
-            mqtt_oh.publish(client, "power_control/" + key, str(serial_arduino.arduino_values[key]))
+            mqtt_oh.publish(client, "power_control/" + key, str(serial_arduino.values[key]))
         for key in modbus_sdm630.keys:
             mqtt_oh.publish(client, "power_control/" + key, str(modbus_sdm630.values[key]))  
         for key in keys:
             mqtt_oh.publish(client, "power_control/" + key, str(values[key])) 
-        serial_arduino.print_values()
-        modbus_sdm630.print_values()
-        print_values()
     
 
 
@@ -44,9 +44,6 @@ def info_loop()
 
 
 if __name__ == "__main__":
-
-    client = connect_mqtt()
-    client.loop_start()
     
     serial_thread = threading.Thread(target=serial_arduino.read_loop)
     serial_thread.start()
@@ -59,9 +56,10 @@ if __name__ == "__main__":
     
     while 1:
         #control algorithm
-        values["set_point"] = 100;
-        serial_arduino.pwm_setpoint(values["set_point"])
         time.sleep(1)
+        update_values()
+        values["setpoint_heat"] = 100;
+        serial_arduino.pwm_setpoint(values["setpoint_heat"])
         
         
         

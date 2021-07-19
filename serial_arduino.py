@@ -2,7 +2,7 @@ import serial
 import io
 ser = serial.serial_for_url('/dev/ttyUSB1', timeout=0.5)
 sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
-keys = {"power_pv", "power_heat", "pwm_setpoint", "temp_high", "temp_low"}
+keys = {"power_pv", "power_heat", "setpoint_pwm", "temp_high", "temp_low"}
 values ={}
 
 
@@ -25,7 +25,7 @@ def read_loop():
         try:
             key, val = line.split(":")
             #print("pair: >>" + key + "<< >>" + val + "<<")
-            for test_key in arduino_keys:
+            for test_key in keys:
                 if key == test_key : #if it exists you can use it
                     #print("matcH: "+ key)
                     values[test_key] = float(val) 
