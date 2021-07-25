@@ -11,8 +11,8 @@ now = datetime.now()
 
 power_target    = 25.0
 power_hist      = 10.0
-weight_down     = 0.1
-weight_up       = 0.01
+weight_down     = 0.2
+weight_up       = 0.05
 
 
 
@@ -74,9 +74,6 @@ if __name__ == "__main__":
     serial_thread = threading.Thread(target=serial_arduino.read_loop)
     serial_thread.start()
     
-    sdm_thread = threading.Thread(target=modbus_sdm630.sync_loop)
-    sdm_thread.start()
-    
     info_thread = threading.Thread(target=info_loop)
     info_thread.start()
     
@@ -86,6 +83,7 @@ if __name__ == "__main__":
 
     while 1:
         #control algorithm
+        modbus_sdm630.sync()
         update_values()
         time.sleep(1)
         values["setpoint_heat"] = control_update(values["power_bal"], values["setpoint_heat"])
