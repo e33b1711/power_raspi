@@ -9,10 +9,10 @@ import time
 from datetime import datetime
 now = datetime.now()
 
-power_target    = 25.0
-power_hist      = 10.0
+power_target    = -50.0
+power_hist      = 20.0
 weight_down     = 0.2
-weight_up       = 0.05
+weight_up       = 0.02
 
 
 
@@ -31,11 +31,12 @@ def print_values():
 def info_loop():
     client = mqtt_oh.connect_mqtt()
     client.loop_start()
+    time.sleep(5)
     while 1:
-        time.sleep(5)
-        serial_arduino.print_values()
-        modbus_sdm630.print_values()
-        print_values()
+        time.sleep(1)
+        #serial_arduino.print_values()
+        #modbus_sdm630.print_values()
+        #print_values()
         for key in serial_arduino.keys:
             mqtt_oh.publish(client, "power_control/" + key, str(serial_arduino.values[key]))
         for key in modbus_sdm630.keys:
@@ -45,8 +46,9 @@ def info_loop():
     
 
 def control_update(power_bal, setpoint_heat):
-    power_diff = power_bal + power_target;
-    print("power_diff: " + str(power_diff))
+    power_diff = power_bal - power_target
+    #print("power_bal: " + str(power_bal))
+    #print("power_diff: " + str(power_diff))
     #histeresys
     if abs(power_diff) < power_hist:
         setpoint_update = setpoint_heat
@@ -62,7 +64,7 @@ def control_update(power_bal, setpoint_heat):
     
     if setpoint_update<0:
         setpoint_update = 0
-    print("setpoint_update: " + str(setpoint_update))
+    #print("setpoint_update: " + str(setpoint_update))
     return setpoint_update
             
 
@@ -71,6 +73,8 @@ def control_update(power_bal, setpoint_heat):
 
 if __name__ == "__main__":
     
+    modbus_sdm630.sync()
+
     serial_thread = threading.Thread(target=serial_arduino.read_loop)
     serial_thread.start()
     
@@ -85,10 +89,9 @@ if __name__ == "__main__":
         #control algorithm
         modbus_sdm630.sync()
         update_values()
-        time.sleep(1)
         values["setpoint_heat"] = control_update(values["power_bal"], values["setpoint_heat"])
         serial_arduino.pwm_setpoint(values["setpoint_heat"])
-        
+        time.sleep(0.8)
         
         
         

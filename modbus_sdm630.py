@@ -20,16 +20,16 @@ def print_values():
 def sync():
     client.connect()
 
-        for index in range(len(addresses)):
-            result =  client.read_input_registers(address=addresses[index], count=2, unit=1)
+    for index in range(len(addresses)):
+        result =  client.read_input_registers(address=addresses[index], count=2, unit=1)
         
-            if result.isError():
-                print("sdm630 error")
-                values[keys[index]] = 100000.0
-            else:
-                decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
-                values[keys[index]] = decoder.decode_32bit_float()
-        time.sleep(0.2)
+        if result.isError():
+            print("sdm630 error")
+            values[keys[index]] = 100000.0
+        else:
+            decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
+            values[keys[index]] = decoder.decode_32bit_float()
+    time.sleep(0.2)
         
     client.close()
     
