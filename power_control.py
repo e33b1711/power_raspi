@@ -11,8 +11,8 @@ now = datetime.now()
 
 power_target    = 25.0
 power_hist      = 10.0
-weight_down     = 0.3
-weight_up       = 0.1
+weight_down     = 0.1
+weight_up       = 0.01
 
 
 
@@ -46,14 +46,15 @@ def info_loop():
 
 def control_update(power_bal, setpoint_heat):
     power_diff = power_bal + power_target;
+    print("power_diff: " + str(power_diff))
     #histeresys
     if abs(power_diff) < power_hist:
         setpoint_update = setpoint_heat
     else:
-        if power_diff > 0 then:
-            setpoint_update = setpoint_heat + weight_down * power_diff
+        if power_diff > 0:
+            setpoint_update = setpoint_heat - weight_down * power_diff
         else:
-            setpoint_update = setpoint_heat + weight_up * power_diff
+            setpoint_update = setpoint_heat - weight_up * power_diff
     
     #saturate
     if setpoint_update > 255:
@@ -61,7 +62,7 @@ def control_update(power_bal, setpoint_heat):
     
     if setpoint_update<0:
         setpoint_update = 0
-    
+    print("setpoint_update: " + str(setpoint_update))
     return setpoint_update
             
 
