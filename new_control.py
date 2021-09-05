@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from pymodbus.client.sync import ModbusTcpClient
 import time
 import numpy as np
