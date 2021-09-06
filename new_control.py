@@ -111,8 +111,8 @@ if __name__ == "__main__":
                     #turn control on
                     control_state  = 1
                     trans_count    = 0
+                    venus_client.write_register(address=33, values=2, unit=0) #set to charger only to prevent feed in during heat control
                     print("turning heat control on")
-                    #TODO: turn ESS to charge only
 
             if control_state==1:
                 #control algorithm
@@ -127,6 +127,7 @@ if __name__ == "__main__":
                     control_state  = 0
                     trans_count    = 0
                     setpoint_heat  = 0
+                    venus_client.write_register(address=33, values=3, unit=0) #set back to on (charger & inverter)
                     print("turning heat control off")
                     #TODO: turn ESS to charge / discharge
                     
