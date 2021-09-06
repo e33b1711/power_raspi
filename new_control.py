@@ -8,6 +8,10 @@ import sys
 
 import serial_arduino
 
+#TODO: handle modbus errors
+#TODO: tighter control loop if battery is full (BUT: how to not prevent absorbtion)
+#TODO: read back values form arduino (temp high / low)
+
 
 power_hist      = 20.0
 weight_down     = 0.2
@@ -65,7 +69,7 @@ if __name__ == "__main__":
     last_time       = time.time()
     this_time       = time.time()
     
-    #TODO: read back values form arduino (temp high / low)
+
 
     while 1:
         #ensure 1 second cycle time
