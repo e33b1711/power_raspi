@@ -3,6 +3,8 @@
 from pymodbus.client.sync import ModbusTcpClient
 import time
 import numpy as np
+import signal
+import sys
 
 import serial_arduino
 
@@ -10,7 +12,22 @@ import serial_arduino
 power_hist      = 20.0
 weight_down     = 0.2
 weight_up       = 0.02
+power_on        = -200   #grid power value to turn on heat control
+count_on        = 10     #how often we need to see control on condition
+count_off       = 3      #how often we need to see control off condition
+target_power    = -100   #battery charging (carefull control)
 
+
+venus_client    = ModbusTcpClient('venus.fritz.box')
+sdm_client      = ModbusTcpClient('127.0.0.1')
+
+
+def signal_handler(sig, frame):
+    print('Closing modbus clients...')
+    venus_client.close()
+    sdm_client.close()
+    sys.exit(0)
+    
 
 def control_update(grid_power, setpoint_heat, target_power):
     power_diff = grid_power - target_power
@@ -24,7 +41,7 @@ def control_update(grid_power, setpoint_heat, target_power):
             setpoint_update = setpoint_heat - weight_down * power_diff
         else:
             setpoint_update = setpoint_heat - weight_up * power_diff
-    
+            
     #saturate
     if setpoint_update > 255:
         setpoint_update = 255
@@ -36,49 +53,88 @@ def control_update(grid_power, setpoint_heat, target_power):
 
 
 
-if __name__ == "__main__":
 
-    client = ModbusTcpClient('venus.fritz.box')
-    setpoint_heat=0
+
+if __name__ == "__main__":
+    
+    signal.signal(signal.SIGINT, signal_handler)
+
+    setpoint_heat   = 0     #pwm heat setpoint
+    control_state   = 0     #0=heat control off (ESS on) / 1=heat control on (ESS charge only)
+    trans_count     = 0
+    last_time       = time.time()
+    this_time       = time.time()
+    
+    #TODO: read back values form arduino (temp high / low)
 
     while 1:
+        #ensure 1 second cycle time
+        this_time = time.time()
+        if last_time + 1 > this_time:
+            time.sleep(0.05)
+        else:
+            last_time = this_time
         
-        #get data from venus
-        result =  client.read_input_registers(address=844, count=2, unit=0)
-        print("state (0=idle;1=charging;2=discharging): ") 
-        print(result.registers[0])
-        ess_state =  result.registers[0]
+            #get data from venus
+            result =  venus_client.read_input_registers(address=844, count=2, unit=0)
+            print("state (0=idle;1=charging;2=discharging): ") 
+            print(result.registers[0])
+            ess_state =  result.registers[0]
+        
+            #grid power is read directly from meter
+            result =  sdm_client.read_input_registers(address=0x0C, count=2, unit=1)
+            print("Grid L1: ") 
+            print(result.registers[0])
+            grid_power = np.int16(result.registers[0])
+            result =  sdm_client.read_input_registers(address=0x0E, count=2, unit=1)
+            print("Grid L2: ") 
+            print(result.registers[0])
+            grid_power += np.int16(result.registers[0])
+            result =  sdm_client.read_input_registers(address=ox10, count=2, unit=1)
+            print("Grid L3: ") 
+            print(result.registers[0])
+            grid_power += np.int16(result.registers[0])
+            print("Grid power: ") 
+            print(grid_power)
+        
+        
+            if control_state==0:
+                #heat is off
+                setpoint_heat=0
+                #we want to see negative grid power several times
+                if grid_power < power_on:
+                    trans_count +=1
+                else:
+                    trans_count = 0
 
-        result =  client.read_input_registers(address=820, count=2, unit=0)
-        print("Grid L1: ") 
-        print(result.registers[0])
-        grid_power = np.int16(result.registers[0])
-        result =  client.read_input_registers(address=821, count=2, unit=0)
-        print("Grid L2: ") 
-        print(result.registers[0])
-        grid_power += np.int16(result.registers[0])
-        result =  client.read_input_registers(address=822, count=2, unit=0)
-        print("Grid L3: ") 
-        print(result.registers[0])
-        grid_power += np.int16(result.registers[0])
-        print("Grid power: ") 
-        print(grid_power)
-        
-        #set target power depending on ess_state
-        target_power=-10000   #like off
-        if ess_state==0:
-            target_power = -50    #battery is idle (close control)
-        
-        if ess_state==1:
-            target_power = -100   #battery charging (carefull control)
-            
-        #control algorithm
-        setpoint_heat = control_update(grid_power, setpoint_heat, target_power)
-        print("setpoint: ")
-        print(setpoint_heat)
-        serial_arduino.pwm_setpoint(values["setpoint_heat"])
-        time.sleep(1)
-        
+                if trans_count > count_on:
+                    #turn control on
+                    control_state  = 1
+                    trans_count    = 0
+                    print("turning heat control on")
+                    #TODO: turn ESS to charge only
+
+            if control_state==1:
+                #control algorithm
+                setpoint_heat = control_update(grid_power, setpoint_heat, target_power)
+                #grid feed in and heating completly off
+                if grid_power>0 and setpoint_heat=0:
+                    trans_count +=1
+                else:
+                    trans_count = 0
+                if trans_count > count_off:
+                    #turn control on
+                    control_state  = 0
+                    trans_count    = 0
+                    setpoint_heat  = 0
+                    print("turning heat control off")
+                    #TODO: turn ESS to charge / discharge
+                    
+            #write pwm 
+            print("setpoint: ")
+            print(setpoint_heat)
+            serial_arduino.pwm_setpoint(values["setpoint_heat"])
+
      
     
-    client.close()
+    
