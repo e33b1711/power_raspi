@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.constants import Endian
+from pymodbus.payload import BinaryPayloadDecoder
 import time
 import numpy as np
 import signal
@@ -69,7 +71,9 @@ if __name__ == "__main__":
     last_time       = time.time()
     this_time       = time.time()
     
-    
+    #set ESS to charge / invert
+    result = venus_client.write_register(address=33, value=3, unit=228) 
+
     while 1:
         #ensure 1 second cycle time
         this_time = time.time()
@@ -80,28 +84,40 @@ if __name__ == "__main__":
         
             #get data from venus
             result =  venus_client.read_input_registers(address=844, count=2, unit=0)
-            print("state (0=idle;1=charging;2=discharging): ") 
-            print(result.registers[0])
+            print("state (0=idle;1=charging;2=discharging): " + str(result.registers[0])) 
+            #print(result.registers[0])
             ess_state =  result.registers[0]
         
             #grid power is read directly from meter
             result =  sdm_client.read_input_registers(address=0x0C, count=2, unit=1)
+            print(result.isError())
+            decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
+            l1_power = decoder.decode_32bit_float()
             #print("Grid L1: ") 
-            print(result.registers[0])
-            grid_power = np.int16(result.registers[0])
+            #print(l1_power)
+            grid_power = l1_power
+            
             result =  sdm_client.read_input_registers(address=0x0E, count=2, unit=1)
-            #print("Grid L2: ") 
-            print(result.registers[0])
-            grid_power += np.int16(result.registers[0])
+            print(result.isError())
+            decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
+            l2_power = decoder.decode_32bit_float()
+            #print("Grid L2: ")
+            #print(l2_power)
+            grid_power += l2_power
+
             result =  sdm_client.read_input_registers(address=0x10, count=2, unit=1)
-            #print("Grid L3: ") 
-            print(result.registers[0])
-            grid_power += np.int16(result.registers[0])
-            print("Grid power: ") 
-            print(grid_power)
+            print(result.isError())
+            decoder = BinaryPayloadDecoder.fromRegisters(result.registers, wordorder=Endian.Big, byteorder=Endian.Big)
+            l3_power = decoder.decode_32bit_float()
+            #print("Grid L3: ")
+            #print(l3_power)
+            grid_power += l3_power
+
+            print("Grid power: " + str(grid_power)) 
         
         
             if control_state==0:
+                print("heat control is off.")
                 #heat is off
                 setpoint_heat=0
                 #we want to see negative grid power several times
@@ -114,10 +130,11 @@ if __name__ == "__main__":
                     #turn control on
                     control_state  = 1
                     trans_count    = 0
-                    venus_client.write_register(address=33, values=1, unit=228) #set to charger only to prevent feed in during heat control
+                    venus_client.write_register(address=33, value=1, unit=228) #set to charger only to prevent feed in during heat control
                     print("turning heat control on")
 
             if control_state==1:
+                print("heat control is on.")
                 #control algorithm
                 setpoint_heat = control_update(grid_power, setpoint_heat, target_power)
                 #grid feed in and heating completly off
@@ -130,13 +147,12 @@ if __name__ == "__main__":
                     control_state  = 0
                     trans_count    = 0
                     setpoint_heat  = 0
-                    venus_client.write_register(address=33, values=3, unit=228) #set back to on (charger & inverter)
+                    venus_client.write_register(address=33, value=3, unit=228) #set back to on (charger & inverter)
                     print("turning heat control off")
                     #TODO: turn ESS to charge / discharge
                     
             #write pwm 
-            print("setpoint: ")
-            print(setpoint_heat)
+            print("setpoint: " + str(setpoint_heat))
             serial_arduino.pwm_setpoint(setpoint_heat)
 
      
