@@ -69,7 +69,11 @@ if __name__ == "__main__":
     last_time       = time.time()
     this_time       = time.time()
     
-
+    print("set ESS test")
+    venus_client.write_register(address=33, value=2, unit=0) #set to charger only to prevent feed in during heat control
+    time.sleep(60)
+    venus_client.write_register(address=33, value=3, unit=0) #set to charger only to prevent feed in during heat control
+    print("set ESS test end")
 
     while 1:
         #ensure 1 second cycle time
@@ -87,15 +91,15 @@ if __name__ == "__main__":
         
             #grid power is read directly from meter
             result =  sdm_client.read_input_registers(address=0x0C, count=2, unit=1)
-            print("Grid L1: ") 
+            #print("Grid L1: ") 
             print(result.registers[0])
             grid_power = np.int16(result.registers[0])
             result =  sdm_client.read_input_registers(address=0x0E, count=2, unit=1)
-            print("Grid L2: ") 
+            #print("Grid L2: ") 
             print(result.registers[0])
             grid_power += np.int16(result.registers[0])
-            result =  sdm_client.read_input_registers(address=ox10, count=2, unit=1)
-            print("Grid L3: ") 
+            result =  sdm_client.read_input_registers(address=0x10, count=2, unit=1)
+            #print("Grid L3: ") 
             print(result.registers[0])
             grid_power += np.int16(result.registers[0])
             print("Grid power: ") 
@@ -122,7 +126,7 @@ if __name__ == "__main__":
                 #control algorithm
                 setpoint_heat = control_update(grid_power, setpoint_heat, target_power)
                 #grid feed in and heating completly off
-                if grid_power>0 and setpoint_heat=0:
+                if grid_power>0 and setpoint_heat==0:
                     trans_count +=1
                 else:
                     trans_count = 0
@@ -138,7 +142,7 @@ if __name__ == "__main__":
             #write pwm 
             print("setpoint: ")
             print(setpoint_heat)
-            serial_arduino.pwm_setpoint(values["setpoint_heat"])
+            serial_arduino.pwm_setpoint(setpoint_heat)
 
      
     
