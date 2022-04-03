@@ -17,6 +17,8 @@ victron_host            = '192.168.178.144'
 victron_connection      = 0
 victron_pv_power        = 0
 victron_heat_power      = 0
+victron_mains_power     = 0
+victron_battery_power   = 0
 victron_soc             = 0
 victron_state           = 0   #0=idle;1=charging;2=discharging
 
@@ -108,7 +110,14 @@ def update_heat():
     except:
         heat_connection = 0
         print("Could not connect to echo server!")
-    
+
+
+def to_signed(unsigned):
+    if unsigned>2**15:
+        return int(unsigned)-int(2**16)
+    else:
+        return int(unsigned)
+        
     
 #get the pv power / the power of the heating / the SOC form victron
 def update_victron():
@@ -116,6 +125,8 @@ def update_victron():
     global victron_connection  
     global victron_pv_power    
     global victron_heat_power  
+    global victron_mains_power    
+    global victron_battery_power 
     global victron_soc         
     global victron_state       
 
@@ -137,12 +148,23 @@ def update_victron():
         #print(result.registers[0])
         victron_pv_power = result.registers[0]
         
+        victron_mains_power = 0
+        for add in [820, 821, 822]:
+            result =  client.read_input_registers(address=add, count=2, unit=100)
+            #print(to_signed(result.registers[0]))
+            victron_mains_power += to_signed(result.registers[0])
+        
+        result =  client.read_input_registers(address=842, count=2, unit=100)
+        #print("victron_battery_powerr: ") 
+        #print(result.registers[0])
+        victron_battery_power = to_signed(result.registers[0])
+        
         
         #0.1 scale factor, signed!!
         result =  client.read_input_registers(address=23, count=2, unit=228)
         #print("victron_heat_power: ") 
         #print(result.registers[0]*10)
-        victron_heat_power= result.registers[0]*10
+        victron_heat_power= to_signed(result.registers[0])*10
         
         client.close()
         victron_connection = 1
@@ -161,6 +183,14 @@ def update_victron():
 
 
 if __name__ == "__main__":
+
+    heat_setpoint   = 0
+    warp_setpoint   = 0
+    elo_only = 0
+    
+    update_victron()
+    update_heat()
+    update_warp()
     
     while 1:
     
@@ -169,13 +199,11 @@ if __name__ == "__main__":
         update_warp()
         
         #calc extra pv power, dependend on SOC and pv power
-        extra_pv_power = victron_pv_power - 3000
+        extra_pv_power = victron_pv_power - 2400
         if victron_soc >= 95:
             extra_pv_power = victron_pv_power - 1000
         if victron_soc >= 99:
-            extra_pv_power = victron_pv_power - 600
-        if victron_soc == 100:
-            extra_pv_power = victron_pv_power-400
+            extra_pv_power = victron_pv_power - 400
         
         
         
@@ -185,11 +213,15 @@ if __name__ == "__main__":
         #wallbox has 6 amps min (1320W)
         #ev_extra_power < 13000 needs to be burned with elo heating
         #also some histeresis
-        elo_only = 0
-        if extra_pv_power < 1400:
+        
+        if elo_only == 0 and extra_pv_power < 1400:
             elo_only = 1
-        if extra_pv_power > 2000:
+            heat_setpoint = 0;
+            warp_setpoint = 0
+        if elo_only == 1 and extra_pv_power > 2000:
             elo_only = 0
+            heat_setpoint = 0;
+            warp_setpoint = 0
         
         delta_power = extra_pv_power - warp_power - victron_heat_power
         if elo_only==0:
@@ -209,10 +241,20 @@ if __name__ == "__main__":
                     if warp_setpoint<6:
                         warp_setpoint = 0
         else:
+            warp_setpoint = 0
             if delta_power > 200:
                 heat_setpoint +=5       
             if delta_power < -100:
                 heat_setpoint -=5
+        
+        if heat_setpoint < 0: 
+            heat_setpoint = 0
+        if warp_setpoint < 0: 
+            warp_setpoint = 0
+        if heat_setpoint > 220: 
+            heat_setpoint = 220
+        if warp_setpoint > 20: 
+            warp_setpoint = 20
                     
         #warp_setpoint = int(extra_pv_power / 220)
         #heat_setpoint = int(extra_pv_power / 3000 * 220)
@@ -230,19 +272,22 @@ if __name__ == "__main__":
         
         
         print("--------------------------------------------")
-        print("warp_connection:    " + str(warp_connection))
-        print("victron_connection: " + str(victron_connection))
-        print("heat_connection:    " + str(heat_connection))
-        print("----------------------")
-        print("victron_soc:        " + str(victron_soc))
-        print("victron_pv_power:   " + str(victron_pv_power))
-        print("extra_pv_power:     " + str(extra_pv_power))
-        print("victron_heat_power: " + str(victron_heat_power))
-        print("warp_power:         " + str(warp_power))
-        print("elo_only:           " + str(elo_only))
-        print("delta_power:        " + str(delta_power))
-        print("heat_setpoint:      " + str(heat_setpoint))
-        print("warp_setpoint:      " + str(warp_setpoint))
+        print("warp_connection:       " + str(warp_connection))
+        print("victron_connection:    " + str(victron_connection))
+        print("heat_connection:       " + str(heat_connection))
+        print("--------------------------------")
+        print("victron_soc:           " + str(victron_soc))
+        print("victron_state:         " + str(victron_state))
+        print("victron_pv_power:      " + str(victron_pv_power))
+        print("victron_mains_power:   " + str(victron_mains_power))
+        print("victron_battery_power: " + str(victron_battery_power))
+        print("victron_heat_power:    " + str(victron_heat_power))
+        print("warp_power:            " + str(warp_power))
+        print("extra_pv_power:        " + str(extra_pv_power))
+        print("elo_only:              " + str(elo_only))
+        print("delta_power:           " + str(delta_power))
+        print("heat_setpoint:         " + str(heat_setpoint))
+        print("warp_setpoint:         " + str(warp_setpoint))
         print("--------------------------------------------")
       
         
