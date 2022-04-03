@@ -5,13 +5,6 @@ import requests
 from requests.exceptions import HTTPError
 from requests.structures import CaseInsensitiveDict
 
-#heating's stuff
-HOST                    = "192.168.178.222"  # The server's hostname or IP address
-PORT                    = 8888  # The port used by the server
-heat_setpoint           = 0
-heat_connection         = 0
-
-
 #victron stuff
 victron_host            = '192.168.178.144'
 victron_connection      = 0
@@ -39,12 +32,14 @@ data_null = 'null'
 
 warp_setpoint           = 0
 warp_power              = 0
+warp_energy_counter     = 0
 warp_connection         = 0
 
 #set warp amps / get warp_power
 def update_warp():
     global warp_setpoint          
-    global warp_power            
+    global warp_power  
+    global warp_energy_counter      
     global warp_connection  
     
     #print("------------------------")
@@ -63,6 +58,8 @@ def update_warp():
             #print(key, ":", value)
             if key=='power':
                 warp_power = value
+            if key=='energy_rel':
+                warp_energy_counter = value
             if key=='state':
                 if value!=2:
                     warp_connection=0
@@ -88,29 +85,7 @@ def update_warp():
         warp_connection=0
         print(f'Other error occurred: {err}')
     #print("------------------------")
-    
-    
-
-
-
-#set the pwm heating
-def update_heat():
-    global heat_connection
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            value = str(int(heat_setpoint))
-            send_string = b'!w!P_EL!' + value.encode('ASCII') + b'$\n'
-            #print(send_string)
-            s.sendall(send_string)
-            data = s.recv(1024)
-            #print(f"Received {data!r}")
-            heat_connection = 1
-    except:
-        heat_connection = 0
-        print("Could not connect to echo server!")
-
+   
 
 def to_signed(unsigned):
     if unsigned>2**15:
@@ -184,13 +159,20 @@ def update_victron():
 
 if __name__ == "__main__":
 
-    heat_setpoint   = 0
-    warp_setpoint   = 0
-    elo_only = 0
+    
+    #this will be paramters
+    bypass              = 1         #load without pv control
+    bypass_setpoint     = 20        #setpoint during bypass
+    bypass_energy       = 6         #amount of energy to laod in bypass
+    
+    warp_setpoint       = 0
+    warp_energy         = 0         #loaded til start 
     
     update_victron()
-    update_heat()
     update_warp()
+    
+    warp_energy_zero = warp_energy_counter
+    
     
     while 1:
     
@@ -198,83 +180,48 @@ if __name__ == "__main__":
         update_victron()
         update_warp()
         
+        warp_energy = warp_energy_counter - warp_energy_zero
+        
         #calc extra pv power, dependend on SOC and pv power
         extra_pv_power = victron_pv_power - 2400
         if victron_soc >= 95:
             extra_pv_power = victron_pv_power - 1000
         if victron_soc >= 99:
             extra_pv_power = victron_pv_power - 400
-        
-        
-        
+        delta_power = extra_pv_power - warp_power
        
-        
-
-        #wallbox has 6 amps min (1320W)
-        #ev_extra_power < 13000 needs to be burned with elo heating
-        #also some histeresis
-        
-        if elo_only == 0 and extra_pv_power < 1400:
-            elo_only = 1
-            heat_setpoint = 0;
-            warp_setpoint = 0
-        if elo_only == 1 and extra_pv_power > 2000:
-            elo_only = 0
-            heat_setpoint = 0;
-            warp_setpoint = 0
-        
-        delta_power = extra_pv_power - warp_power - victron_heat_power
-        if elo_only==0:
-            if delta_power > 200:
-                if warp_setpoint < 16:
-                    warp_setpoint +=1
+        if bypass==0:
+            if extra_pv_power > 1400:
+                if delta_power > 200:
+                    if warp_setpoint < 16:
+                        warp_setpoint +=1
                     if warp_setpoint<6:
                         warp_setpoint = 6
-                else:
-                    heat_setpoint +=5
-                    
-            if delta_power < -100:
-                if heat_setpoint > 0:
-                    heat_setpoint -=5
-                else:
+                            
+                if delta_power < -100:
                     warp_setpoint -=1
                     if warp_setpoint<6:
                         warp_setpoint = 0
+            else:
+                warp_setpoint = 0
         else:
-            warp_setpoint = 0
-            if delta_power > 200:
-                heat_setpoint +=5       
-            if delta_power < -100:
-                heat_setpoint -=5
-        
-        if heat_setpoint < 0: 
-            heat_setpoint = 0
-        if warp_setpoint < 0: 
-            warp_setpoint = 0
-        if heat_setpoint > 220: 
-            heat_setpoint = 220
-        if warp_setpoint > 20: 
-            warp_setpoint = 20
-                    
-        #warp_setpoint = int(extra_pv_power / 220)
-        #heat_setpoint = int(extra_pv_power / 3000 * 220)
-        
+            warp_setpoint = bypass_setpoint
+            if warp_energy > bypass_energy:
+                bypass = 0
+            
         
         #if wallbox / victron / power is not avaible => bypass
-        if victron_connection==0 or heat_connection==0 or warp_connection==0:
-            heat_setpoint = 0
+        if victron_connection==0 or warp_connection==0:
             warp_setpoint = 0
 
             
         #write to power sinks
-        update_heat()
         update_warp()
         
         
         print("--------------------------------------------")
         print("warp_connection:       " + str(warp_connection))
         print("victron_connection:    " + str(victron_connection))
-        print("heat_connection:       " + str(heat_connection))
         print("--------------------------------")
         print("victron_soc:           " + str(victron_soc))
         print("victron_state:         " + str(victron_state))
@@ -283,10 +230,12 @@ if __name__ == "__main__":
         print("victron_battery_power: " + str(victron_battery_power))
         print("victron_heat_power:    " + str(victron_heat_power))
         print("warp_power:            " + str(warp_power))
+        print("warp_energy_counter:   " + str(warp_energy_counter)) 
+        print("--------------------------------")
+        print("warp_energy:           " + str(warp_energy))
         print("extra_pv_power:        " + str(extra_pv_power))
-        print("elo_only:              " + str(elo_only))
+        print("bypass:                " + str(bypass))
         print("delta_power:           " + str(delta_power))
-        print("heat_setpoint:         " + str(heat_setpoint))
         print("warp_setpoint:         " + str(warp_setpoint))
         print("--------------------------------------------")
       
