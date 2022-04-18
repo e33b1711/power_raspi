@@ -4,6 +4,8 @@ from pymodbus.client.sync import ModbusTcpClient
 import requests
 from requests.exceptions import HTTPError
 from requests.structures import CaseInsensitiveDict
+import signal
+import sys
 
 #victron stuff
 victron_host            = '192.168.178.144'
@@ -34,6 +36,24 @@ warp_setpoint           = 0
 warp_power              = 0
 warp_energy_counter     = 0
 warp_connection         = 0
+
+def signal_handler(sig, frame):
+    global warp_setpoint
+    warp_setpoint = 20
+    try:
+        response = requests.put(url_stop, headers=headers, data=data_null)
+        response.raise_for_status()
+        data = '{"current":' + str(warp_setpoint) + '000}'
+        response = requests.put(url_limit, headers=headers, data=data)
+        response.raise_for_status()
+    except HTTPError as http_err:
+        warp_connection=0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        warp_connection=0
+        print(f'Other error occurred: {err}')
+    print('Exit...')
+    sys.exit(0)
 
 #set warp amps / get warp_power
 def update_warp():
@@ -159,6 +179,8 @@ def update_victron():
 
 if __name__ == "__main__":
 
+    signal.signal(signal.SIGINT, signal_handler)
+
     
     #this will be paramters
     bypass              = 0         #load without pv control
@@ -201,7 +223,7 @@ if __name__ == "__main__":
         if bypass==0:
             if extra_pv_power > 1400:
                 if delta_power > 200:
-                    if warp_setpoint < 16:
+                    if warp_setpoint < 20:
                         warp_setpoint +=1
                     if warp_setpoint<6:
                         warp_setpoint = 6
