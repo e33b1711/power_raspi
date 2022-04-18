@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     
     #this will be paramters
-    bypass              = 1         #load without pv control
+    bypass              = 0         #load without pv control
     bypass_setpoint     = 20        #setpoint during bypass
     bypass_energy       = 6         #amount of energy to laod in bypass
     
@@ -173,6 +173,8 @@ if __name__ == "__main__":
     
     warp_energy_zero = warp_energy_counter
     
+    victron_pv_power_smooth = victron_pv_power
+    
     
     while 1:
     
@@ -182,13 +184,19 @@ if __name__ == "__main__":
         
         warp_energy = warp_energy_counter - warp_energy_zero
         
+        #smooth pv power
+        victron_pv_power_smooth = 0.95*victron_pv_power_smooth + 0.05*victron_pv_power
+        
         #calc extra pv power, dependend on SOC and pv power
-        extra_pv_power = victron_pv_power - 2400
+        extra_pv_power = round(victron_pv_power_smooth) - 2400
         if victron_soc >= 95:
-            extra_pv_power = victron_pv_power - 1000
+            extra_pv_power = round(victron_pv_power_smooth) - 1000
         if victron_soc >= 99:
-            extra_pv_power = victron_pv_power - 400
+            extra_pv_power = round(victron_pv_power_smooth) - 400
         delta_power = extra_pv_power - warp_power
+       
+       
+        #TODO: some hysteresis / delay between charge / no charge
        
         if bypass==0:
             if extra_pv_power > 1400:
@@ -220,23 +228,24 @@ if __name__ == "__main__":
         
         
         print("--------------------------------------------")
-        print("warp_connection:       " + str(warp_connection))
-        print("victron_connection:    " + str(victron_connection))
+        print("warp_connection:         " + str(warp_connection))
+        print("victron_connection:      " + str(victron_connection))
         print("--------------------------------")
-        print("victron_soc:           " + str(victron_soc))
-        print("victron_state:         " + str(victron_state))
-        print("victron_pv_power:      " + str(victron_pv_power))
-        print("victron_mains_power:   " + str(victron_mains_power))
-        print("victron_battery_power: " + str(victron_battery_power))
-        print("victron_heat_power:    " + str(victron_heat_power))
-        print("warp_power:            " + str(warp_power))
-        print("warp_energy_counter:   " + str(warp_energy_counter)) 
+        print("victron_soc:             " + str(victron_soc))
+        print("victron_state:           " + str(victron_state))
+        print("victron_pv_power:        " + str(victron_pv_power))
+        print("victron_mains_power:     " + str(victron_mains_power))
+        print("victron_battery_power:   " + str(victron_battery_power))
+        print("victron_heat_power:      " + str(victron_heat_power))
+        print("warp_power:              " + str(warp_power))
+        print("warp_energy_counter:     " + str(warp_energy_counter)) 
         print("--------------------------------")
-        print("warp_energy:           " + str(warp_energy))
-        print("extra_pv_power:        " + str(extra_pv_power))
-        print("bypass:                " + str(bypass))
-        print("delta_power:           " + str(delta_power))
-        print("warp_setpoint:         " + str(warp_setpoint))
+        print("warp_energy:             " + str(warp_energy))
+        print("victron_pv_power_smooth: " + str(victron_pv_power_smooth))
+        print("extra_pv_power:          " + str(extra_pv_power))
+        print("bypass:                  " + str(bypass))
+        print("delta_power:             " + str(delta_power))
+        print("warp_setpoint:           " + str(warp_setpoint))
         print("--------------------------------------------")
       
         
