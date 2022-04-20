@@ -1,5 +1,6 @@
 import socket
 import time
+import paho.mqtt.client as mqtt
 from pymodbus.client.sync import ModbusTcpClient
 import requests
 from requests.exceptions import HTTPError
@@ -8,10 +9,17 @@ import signal
 import sys
 import array
 
+#mqtt stuff
+broker_address      = "openhabianpi2.fritz.box"
+state_topic         = "power_state/heat_control"
+command_topic       = "power_command/heat_control"
+client = mqtt.Client("P1")
+
 #heating's stuff
 HOST                    = "192.168.178.222"  # The server's hostname or IP address
 PORT                    = 8888  # The port used by the server
 heat_setpoint           = 0
+heat_control_on         = 0
 heat_connection         = 0
 
 #heat power = (set_point-25)*2900/200
@@ -22,6 +30,7 @@ def signal_handler(sig, frame):
     global heat_setpoint
     heat_setpoint = 0
     update_heat()
+    client.loop_stop() 
     print('Exit...')
     sys.exit(0)
 
@@ -36,6 +45,22 @@ victron_battery_power   = 0
 victron_soc             = 0
 #victron_state           = 0     #0=idle;1=charging;2=discharging
 victron_switch          = 0     #1 chrager / 2= inverter / 3=on / 4=off
+
+def on_message(client, userdata, message):
+    print("message received " ,str(message.payload.decode("utf-8")))
+    print("message topic=",message.topic)
+    print("message qos=",message.qos)
+    print("message retain flag=",message.retain)
+    
+    payload = str(message.payload.decode("utf-8"))
+    global heat_control_on
+    
+    if payload == "1":
+        heat_control_on = 1
+        #may not last long!
+    if payload == "0":
+        heat_control_on = 0
+
 
 
 #set the pwm heating
@@ -131,11 +156,14 @@ def update_victron():
 if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, signal_handler)
+    
+    client.on_message=on_message
+    client.connect(broker_address)
+    client.loop_start() 
+    client.subscribe(command_topic)
 
     heat_setpoint   = 0
-    
-   
-    
+
     update_victron()
     update_heat()
     
@@ -177,10 +205,14 @@ if __name__ == "__main__":
 
         #if wallbox / victron / power is not avaible => bypass
         if victron_connection==0 or heat_connection==0:
-            heat_setpoint = 0        
+            heat_setpoint       = 0    
+            heat_control_on     = 0            
             
         #write to power sinks
         update_heat()
+        
+        #publich state
+        client.publish(state_topic,str(heat_control_on))
         
         
         print("--------------------------------------------")
@@ -198,6 +230,7 @@ if __name__ == "__main__":
         print("victron_battery_power_goal: " + str(victron_battery_power_goal))
         print("delta_power:                " + str(delta_power))
         print("heat_setpoint:              " + str(heat_setpoint))
+        print("heat_control_on:            " + str(heat_control_on))
         print("--------------------------------------------")
 
  
