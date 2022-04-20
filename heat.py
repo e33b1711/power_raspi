@@ -28,8 +28,11 @@ heat_constant = 15 #watts per pwm
 
 def signal_handler(sig, frame):
     global heat_setpoint
-    heat_setpoint = 0
+    global heat_control_on
+    heat_setpoint   = 0
+    heat_control_on = 0
     update_heat()
+    client.publish(state_topic,str(heat_control_on))
     client.loop_stop() 
     print('Exit...')
     sys.exit(0)
@@ -211,7 +214,7 @@ if __name__ == "__main__":
         #write to power sinks
         update_heat()
         
-        #publich state
+        #publish state
         client.publish(state_topic,str(heat_control_on))
         
         
