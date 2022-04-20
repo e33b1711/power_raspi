@@ -198,14 +198,14 @@ if __name__ == "__main__":
         
         if heat_setpoint>220:
             heat_setpoint = 220
-            
-            
-            
-                
+             
 
         #if wallbox / victron / power is not avaible => bypass
-        if victron_connection==0 or heat_connection==0:
-            heat_setpoint       = 0    
+        if victron_connection==0 or heat_connection==0:   
+            heat_control_on = 0    
+        
+        if heat_control_on==0:
+            heat_setpoint   = 0  
             heat_control_on     = 0            
             
         #write to power sinks
