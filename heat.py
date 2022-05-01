@@ -13,6 +13,8 @@ import array
 broker_address      = "openhabianpi2.fritz.box"
 state_topic         = "power_state/heat_control"
 command_topic       = "power_command/heat_control"
+heat_power_topic    = "power_state/victron_heat_power"
+soc_topic         = "power_state/soc"
 client = mqtt.Client("P1")
 
 #heating's stuff
@@ -216,11 +218,13 @@ if __name__ == "__main__":
         
         #publish state
         client.publish(state_topic,str(heat_control_on))
+        client.publish(heat_power_topic,victron_heat_power/1000)
+        client.publish(soc_topic,victron_soc)
         
         
         print("--------------------------------------------")
         print("victron_connection:    " + str(victron_connection))
-        print("heat_connection:       " + str(heat_connection))
+        print("heat_connection:       " + str(victron_heat_power))
         print("--------------------------------")
         print("victron_soc:           " + str(victron_soc))
         #print("victron_state:         " + str(victron_state))

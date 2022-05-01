@@ -1,5 +1,6 @@
 import socket
 import time
+import paho.mqtt.client as mqtt
 from pymodbus.client.sync import ModbusTcpClient
 import requests
 from requests.exceptions import HTTPError
@@ -16,6 +17,14 @@ victron_mains_power     = 0
 victron_battery_power   = 0
 victron_soc             = 0
 victron_state           = 0   #0=idle;1=charging;2=discharging
+
+#mqtt stuff
+broker_address      = "openhabianpi2.fritz.box"
+state_topic         = "power_state/pv_charge_bypass"
+command_topic       = "power_command/pv_charge_bypass"
+power_topic         = "power_state/wallbox_power"
+solar_power_topic   = "power_state/solar_power"
+client = mqtt.Client("P2")
 
 
 #wallbox stuff
@@ -36,9 +45,13 @@ warp_setpoint           = 0
 warp_power              = 0
 warp_energy_counter     = 0
 warp_connection         = 0
+bypass                  = 0         #load without pv control
 
 def signal_handler(sig, frame):
     global warp_setpoint
+    global bypass
+    bypass = 1
+    heat_control_on = 0
     warp_setpoint = 20
     try:
         response = requests.put(url_stop, headers=headers, data=data_null)
@@ -52,8 +65,24 @@ def signal_handler(sig, frame):
     except Exception as err:
         warp_connection=0
         print(f'Other error occurred: {err}')
+    client.publish(state_topic,str(bypass))
     print('Exit...')
     sys.exit(0)
+    
+def on_message(client, userdata, message):
+    print("message received " ,str(message.payload.decode("utf-8")))
+    print("message topic=",message.topic)
+    print("message qos=",message.qos)
+    print("message retain flag=",message.retain)
+    
+    payload = str(message.payload.decode("utf-8"))
+    global bypass
+    
+    if payload == "1":
+        bypass = 1
+        #may not last long!
+    if payload == "0":
+        bypass = 0
 
 #set warp amps / get warp_power
 def update_warp():
@@ -180,10 +209,15 @@ def update_victron():
 if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, signal_handler)
+    
+    #mqtt
+    client.on_message=on_message
+    client.connect(broker_address)
+    client.loop_start() 
+    client.subscribe(command_topic)
 
     
     #this will be paramters
-    bypass              = 0         #load without pv control
     bypass_setpoint     = 20        #setpoint during bypass
     bypass_energy       = 6         #amount of energy to laod in bypass
     
@@ -247,6 +281,11 @@ if __name__ == "__main__":
             
         #write to power sinks
         update_warp()
+        
+        #mqtt
+        client.publish(state_topic,str(bypass))
+        client.publish(power_topic,warp_power/1000)
+        client.publish(solar_power_topic,victron_pv_power/1000)
         
         
         print("--------------------------------------------")
