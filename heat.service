@@ -1,0 +1,14 @@
+[Unit]
+Description=pv heat service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=openhabian
+ExecStart=/home/openhabian/power_raspi/heat.py
+
+[Install]
+WantedBy=multi-user.target
