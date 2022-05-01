@@ -226,7 +226,7 @@ if __name__ == "__main__":
         
         print("--------------------------------------------")
         print("victron_connection:    " + str(victron_connection))
-        print("heat_connection:       " + str(victron_heat_power))
+        print("heat_connection:       " + str(heat_connection))
         print("--------------------------------")
         print("victron_soc:           " + str(victron_soc))
         #print("victron_state:         " + str(victron_state))
