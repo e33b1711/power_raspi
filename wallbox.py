@@ -48,6 +48,7 @@ warp_power              = 0
 warp_energy_counter     = 0
 warp_connection         = 0
 bypass                  = 0         #load without pv control
+bypass_energy_start      = 0
 
 def signal_handler(sig, frame):
     global warp_setpoint
@@ -79,9 +80,11 @@ def on_message(client, userdata, message):
     
     payload = str(message.payload.decode("utf-8"))
     global bypass
+    global bypass_energy_start
     
     if payload == "1":
-        bypass = 1
+        bypass              = 1
+        bypass_energy_start  = warp_energy_counter
         #may not last long!
     if payload == "0":
         bypass = 0
@@ -221,7 +224,7 @@ if __name__ == "__main__":
     
     #this will be paramters
     bypass_setpoint     = 20        #setpoint during bypass
-    bypass_energy       = 6         #amount of energy to laod in bypass
+    bypass_energy       = 20        #amount of energy to laod in bypass
     
     warp_setpoint       = 0
     warp_energy         = 0         #loaded til start 
@@ -229,7 +232,6 @@ if __name__ == "__main__":
     update_victron()
     update_warp()
     
-    warp_energy_zero = warp_energy_counter
     
     victron_pv_power_smooth = victron_pv_power
     
@@ -240,7 +242,6 @@ if __name__ == "__main__":
         update_victron()
         update_warp()
         
-        warp_energy = warp_energy_counter - warp_energy_zero
         
         #smooth pv power
         victron_pv_power_smooth = 0.95*victron_pv_power_smooth + 0.05*victron_pv_power
@@ -272,7 +273,7 @@ if __name__ == "__main__":
                 warp_setpoint = 0
         else:
             warp_setpoint = bypass_setpoint
-            if warp_energy > bypass_energy:
+            if warp_energy > bypass_energy_start + bypass_energy:
                 bypass = 0
             
         
@@ -307,6 +308,7 @@ if __name__ == "__main__":
         print("victron_pv_power_smooth: " + str(victron_pv_power_smooth))
         print("extra_pv_power:          " + str(extra_pv_power))
         print("bypass:                  " + str(bypass))
+        print("bypass_energy_start:     " + str(bypass_energy_start))
         print("delta_power:             " + str(delta_power))
         print("warp_setpoint:           " + str(warp_setpoint))
         print("--------------------------------------------")
