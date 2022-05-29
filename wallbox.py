@@ -48,7 +48,8 @@ warp_power              = 0
 warp_energy_counter     = 0
 warp_connection         = 0
 bypass                  = 0         #load without pv control
-bypass_energy_start      = 0
+bypass_energy_start     = 0
+bypass_time_start       = 0
 
 def signal_handler(sig, frame):
     global warp_setpoint
@@ -81,10 +82,12 @@ def on_message(client, userdata, message):
     payload = str(message.payload.decode("utf-8"))
     global bypass
     global bypass_energy_start
+    global bypass_time_start
     
     if payload == "1":
-        bypass              = 1
-        bypass_energy_start  = warp_energy_counter
+        bypass                  = 1
+        bypass_energy_start     = warp_energy_counter
+        bypass_time_start       = round(time.time()/60)   #time in minutes
         #may not last long!
     if payload == "0":
         bypass = 0
@@ -225,6 +228,7 @@ if __name__ == "__main__":
     #this will be paramters
     bypass_setpoint     = 20        #setpoint during bypass
     bypass_energy       = 20        #amount of energy to laod in bypass
+    bypass_minutes      = 6*60      #after this many minutes bypass ends
     
     warp_setpoint       = 0
     warp_energy         = 0         #loaded til start 
@@ -275,6 +279,8 @@ if __name__ == "__main__":
             warp_setpoint = bypass_setpoint
             if warp_energy > bypass_energy_start + bypass_energy:
                 bypass = 0
+            if bypass_time_start+bypass_minutes < round(time.time()/60):
+                bypass = 0
             
         
         #if wallbox / victron / power is not avaible => bypass
@@ -309,6 +315,8 @@ if __name__ == "__main__":
         print("extra_pv_power:          " + str(extra_pv_power))
         print("bypass:                  " + str(bypass))
         print("bypass_energy_start:     " + str(bypass_energy_start))
+        print("bypass_time_start:       " + str(bypass_time_start))
+        print("time (minutes):          " + str(round(time.time()/60)))
         print("delta_power:             " + str(delta_power))
         print("warp_setpoint:           " + str(warp_setpoint))
         print("--------------------------------------------")
