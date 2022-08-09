@@ -175,10 +175,11 @@ def update_victron():
         #print(result.registers[0])
         victron_soc = result.registers[0]
         
-        result =  client.read_input_registers(address=812, count=2, unit=100)
-        #print("PV power: ") 
-        #print(result.registers[0])
-        victron_pv_power = result.registers[0]
+        victron_pv_power = 0
+        for add in [811, 812, 813]:
+            result =  client.read_input_registers(address=add, count=2, unit=100)
+            #print(to_signed(result.registers[0]))
+            victron_pv_power += to_signed(result.registers[0])
         
         victron_mains_power = 0
         for add in [820, 821, 822]:
