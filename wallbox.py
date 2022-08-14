@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+#TODO
+#wallbox get infos      (x)
+#wallbox set            ()
+#heat set               ()
+#mqtt receive           ()
+#algo                   ()
+
+
 import socket
 import time
 import paho.mqtt.client as mqtt
@@ -62,14 +70,75 @@ victron_scale = {
     'state_of_charge':          1
 }       
 
-
-charger_addresses = {
-    'charger_power':            0,        
-    'charger_setpoint':         0,
-    'charger_connected':        0,
-    'charger_status':           0
-   
+#charger stuff
+charger_keys = {
+    'power':                        'charger_power',        
+    'allowed_charging_current':     'charger_setpoint',        
+    'vehicle_state':                'charger_status'        
 }
+
+charger_scale = {
+    'charger_power':        1,        
+    'charger_setpoint':     0.001,        
+    'charger_status':       1        
+}
+
+url_meter       = 'http://192.168.178.43/meter/state'
+url_controller  = 'http://192.168.178.43/evse/state'
+
+
+
+
+url_limit = 'http://192.168.178.43/evse/current_limit'
+url_stop = 'http://192.168.178.43/evse/stop_charging'
+url_start = 'http://192.168.178.43/evse/start_charging'
+headers = CaseInsensitiveDict()
+headers["Content-Type"] = "application/json"
+data_null = 'null'
+
+def read_charger():
+
+    #print("------------------------")
+
+    try:
+        
+        response = requests.get(url_meter)
+        response.raise_for_status()
+        jsonResponse = response.json()
+        for key, value in jsonResponse.items():
+            #print(key, ":", value)
+            for rev_key in charger_keys:
+                if key == rev_key:
+                    all_data[charger_keys[rev_key]] = value*charger_scale[charger_keys[rev_key]]
+
+        response = requests.get(url_controller)
+        response.raise_for_status()
+        jsonResponse = response.json()
+        for key, value in jsonResponse.items():
+            #print(key, ":", value)
+            for rev_key in charger_keys:
+                if key == rev_key:
+                    all_data[charger_keys[rev_key]] = value*charger_scale[charger_keys[rev_key]]
+      
+        all_data['charger_connected']  = 1
+        
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
+    #print("------------------------")
+   
+
+def to_signed(unsigned):
+    if unsigned>2**15:
+        return int(unsigned)-int(2**16)
+    else:
+        return int(unsigned)
+
+
+
 
 #mqtt stuff
 #state topics:  are just the dictonary names 
@@ -93,7 +162,7 @@ def to_signed(unsigned):
         
     
 #get the pv power / the power of the heating / the SOC form victron
-def update_victron():
+def read_victron():
     global all_data
     global victron_modbus  
 
@@ -148,9 +217,11 @@ if __name__ == "__main__":
     while 1:
     
         #read infos
-        update_victron()
+        read_victron()
+        read_charger()
         publish_mqtt()
         print_alldata();
+        read_charger();
         
         time.sleep(10)
         
