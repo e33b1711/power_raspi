@@ -3,8 +3,8 @@
 #TODO
 #wallbox get infos      (x)
 #wallbox set            ()
-#heat set               ()
-#mqtt receive           ()
+#heat set               (x)
+#mqtt receive           (x)
 #algo                   ()
 
 
@@ -23,6 +23,7 @@ victron_host            = '192.168.178.144'
 
 #victron data
 all_data = {
+    #collected data
     'grid_power':               -1,           
     'solar_power':              -1,           
     'battery_power':            -1,         
@@ -34,7 +35,11 @@ all_data = {
     'charger_power':            -1,        
     'charger_setpoint':         -1,
     'charger_connected':        0,
-    'charger_status':           -1
+    'charger_status':           -1,
+    'heat_connected':           -1,
+    #own data
+    'solar2heat':               0,
+    'solar2car':                0
 }    
 
 victron_modbus = {
@@ -96,6 +101,27 @@ headers = CaseInsensitiveDict()
 headers["Content-Type"] = "application/json"
 data_null = 'null'
 
+def signal_handler(sig, frame):
+    all_data['solar2heat']  = 0
+    all_data['solar2car']   = 0
+
+    #set heat to zero
+    
+    #set wallbox to 10A / start charging
+    
+    #publish mqtt control states
+    read_victron()
+    read_charger()
+    all_data['charger_connected']  = 0
+    all_data['victron_connected']  = 0
+    all_data['heat_connected']  = 0
+    publish_mqtt()
+    
+    print('Exit...')
+    sys.exit(0)
+    
+    
+
 def read_charger():
 
     #print("------------------------")
@@ -145,6 +171,7 @@ def to_signed(unsigned):
 broker_address = "openhabianpi2.fritz.box"
 mqtt_state_prefix = "power_state/"
 client = mqtt.Client("P2")
+command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_control"];
 
 
 def on_message(client, userdata, message):
@@ -152,6 +179,20 @@ def on_message(client, userdata, message):
     print("message topic=",message.topic)
     print("message qos=",message.qos)
     print("message retain flag=",message.retain)
+    payload = str(message.payload.decode("utf-8"))
+    
+    if message.topic==command_topics[0]:
+        key = 'solar2heat'
+        all_data[key] = message.payload.decode("utf-8")
+        client.publish(mqtt_state_prefix + key, all_data[key])
+    if message.topic==command_topics[1]:
+        key = 'solar2car'
+        all_data[key] = message.payload.decode("utf-8")
+        client.publish(mqtt_state_prefix + key, all_data[key])
+    if message.topic==command_topics[2]:
+        #charger set point up down (when controll off)
+        pass
+        
    
 
 def to_signed(unsigned):
@@ -201,6 +242,26 @@ def print_alldata():
 def publish_mqtt():
     for key in all_data.keys():
         client.publish(mqtt_state_prefix + key, all_data[key])
+        
+        
+#set the pwm heating
+HOST                    = "192.168.178.222"  # The server's hostname or IP address
+PORT                    = 8888  # The port used by the server
+def update_heat(heat_setpoint):
+    global all_data
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+            value = str(int(heat_setpoint))
+            send_string = b'!w!U_EL!' + value.encode('ASCII') + b'$\n'
+            #print(send_string)
+            s.sendall(send_string)
+            data = s.recv(1024)
+            #print(f"Received {data!r}")
+            all_data['heat_connected']  = 1
+    except:
+        all_data['heat_connected']  = 0
+        print("Could not connect to echo server!")
     
        
 
@@ -208,11 +269,19 @@ def publish_mqtt():
     
 if __name__ == "__main__":
 
+    #gracefull strg+c
+    signal.signal(signal.SIGINT, signal_handler)
+       
+
     #mqtt
     client.on_message=on_message
     client.connect(broker_address)
     client.loop_start() 
-    #client.subscribe(command_topic)
+    for topic in command_topics:
+        client.subscribe(topic)
+        
+    heat_setpoint   = 50
+    heat_incr       = 4
 
     while 1:
     
@@ -220,8 +289,16 @@ if __name__ == "__main__":
         read_victron()
         read_charger()
         publish_mqtt()
-        print_alldata();
-        read_charger();
+        print_alldata()
+        read_charger()
+        
+        if heat_setpoint>100:
+            heat_incr=-4
+        if heat_setpoint<20:
+            heat_incr=4
+        
+        heat_setpoint+=heat_incr    
+        update_heat(heat_setpoint)
         
         time.sleep(10)
         
