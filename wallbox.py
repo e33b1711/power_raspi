@@ -104,9 +104,6 @@ data_null = 'null'
 def signal_handler(sig, frame):
     all_data['solar2heat']  = 0
     all_data['solar2car']   = 0
-
-    #set heat to zero
-    
     #set wallbox to 10A / start charging
     
     #publish mqtt control states
@@ -183,11 +180,11 @@ def on_message(client, userdata, message):
     
     if message.topic==command_topics[0]:
         key = 'solar2heat'
-        all_data[key] = message.payload.decode("utf-8")
+        all_data[key] = int(message.payload.decode("utf-8"))
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[1]:
         key = 'solar2car'
-        all_data[key] = message.payload.decode("utf-8")
+        all_data[key] = int(message.payload.decode("utf-8"))
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[2]:
         #charger set point up down (when controll off)
@@ -279,8 +276,9 @@ if __name__ == "__main__":
     client.loop_start() 
     for topic in command_topics:
         client.subscribe(topic)
-        
-    heat_setpoint   = 50
+    
+    #local variable not visible over mqtt
+    heat_setpoint   = 0
     heat_incr       = 4
 
     while 1:
@@ -292,12 +290,19 @@ if __name__ == "__main__":
         print_alldata()
         read_charger()
         
-        if heat_setpoint>100:
-            heat_incr=-4
-        if heat_setpoint<20:
-            heat_incr=4
+        print(all_data['solar2heat'])
+        if all_data['solar2heat']==1:
+            if heat_setpoint>240:
+                heat_incr=-4
+            if heat_setpoint<220:
+                heat_incr=4
+                heat_setpoint = 220
+            heat_setpoint+=heat_incr    
+        else:
+            heat_setpoint = 0
+                
         
-        heat_setpoint+=heat_incr    
+        
         update_heat(heat_setpoint)
         
         time.sleep(10)
