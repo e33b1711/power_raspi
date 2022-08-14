@@ -2,7 +2,7 @@
 
 #TODO
 #wallbox get infos      (x)
-#wallbox set            ()
+#wallbox set            (x)
 #heat set               (x)
 #mqtt receive           (x)
 #algo                   ()
@@ -120,9 +120,6 @@ def signal_handler(sig, frame):
     
 
 def read_charger():
-
-    #print("------------------------")
-
     try:
         
         response = requests.get(url_meter)
@@ -151,8 +148,34 @@ def read_charger():
     except Exception as err:
         all_data['charger_connected']  = 0
         print(f'Other error occurred: {err}')
-    #print("------------------------")
-   
+
+    
+def set_charger(setpoint):
+
+    try:
+     
+        #set amps
+        if setpoint<6:
+            response = requests.put(url_stop, headers=headers, data=data_null)
+            response.raise_for_status()
+        else:
+            if setpoint <=20:
+                response = requests.put(url_start, headers=headers, data=data_null)
+                response.raise_for_status()
+                data = '{"current":' + str(int(setpoint)) + '000}'
+                print(data)
+                response = requests.put(url_limit, headers=headers, data=data)
+                response.raise_for_status()
+      
+        all_data['charger_connected']  = 1
+        
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
+
 
 def to_signed(unsigned):
     if unsigned>2**15:
@@ -187,8 +210,17 @@ def on_message(client, userdata, message):
         all_data[key] = int(message.payload.decode("utf-8"))
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[2]:
-        #charger set point up down (when controll off)
-        pass
+        if all_data['solar2car']==0:
+            read_charger()
+            key='charger_setpoint'
+            if int(message.payload.decode("utf-8"))==1:
+                if all_data[key]<20:
+                    set_charger(all_data[key]+1)
+            if int(message.payload.decode("utf-8"))==0:
+                if all_data[key]>6:
+                    set_charger(all_data[key]-1)
+            read_charger()
+            client.publish(mqtt_state_prefix + key, all_data[key])
         
    
 
@@ -279,7 +311,6 @@ if __name__ == "__main__":
     
     #local variable not visible over mqtt
     heat_setpoint   = 0
-    heat_incr       = 4
 
     while 1:
     
@@ -290,20 +321,16 @@ if __name__ == "__main__":
         print_alldata()
         read_charger()
         
-        print(all_data['solar2heat'])
         if all_data['solar2heat']==1:
-            if heat_setpoint>240:
-                heat_incr=-4
-            if heat_setpoint<220:
-                heat_incr=4
-                heat_setpoint = 220
-            heat_setpoint+=heat_incr    
+            #fix on by now
+            heat_setpoint = 220  
         else:
             heat_setpoint = 0
-                
-        
-        
         update_heat(heat_setpoint)
+        
+        if all_data['solar2car']==1:
+            #turn off by now
+            set_charger(0)
         
         time.sleep(10)
         
