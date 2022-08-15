@@ -32,7 +32,6 @@ all_data = {
     'victron_connected':        0,    
     'victron_status':           -1,        
     'state_of_charge':          -1,
-    'battery_charge_limit':     0,
     'charger_power':            -1,        
     'charger_setpoint':         -1,
     'charger_connected':        0,
@@ -52,8 +51,7 @@ victron_modbus = {
     'criticial_loads_power':    [23], 
     'victron_connected':        [],    
     'victron_status':           [844],        
-    'state_of_charge':          [843],
-    'battery_charge_limit':     [2701]
+    'state_of_charge':          [843]
 }    
 
 victron_unit = {
@@ -64,8 +62,7 @@ victron_unit = {
     'criticial_loads_power':    228, 
     'victron_connected':        100,    
     'victron_status':           100,        
-    'state_of_charge':          100,
-    'battery_charge_limit':     100
+    'state_of_charge':          100
 } 
 
 victron_scale = {
@@ -76,8 +73,7 @@ victron_scale = {
     'criticial_loads_power':    10, 
     'victron_connected':        1,    
     'victron_status':           1,        
-    'state_of_charge':          1,
-    'battery_charge_limit':     1
+    'state_of_charge':          1
 }       
 
 #charger stuff
@@ -168,7 +164,6 @@ def set_charger(setpoint):
                 response = requests.put(url_start, headers=headers, data=data_null)
                 response.raise_for_status()
                 data = '{"current":' + str(int(setpoint)) + '000}'
-                print(data)
                 response = requests.put(url_limit, headers=headers, data=data)
                 response.raise_for_status()
       
@@ -322,7 +317,7 @@ if __name__ == "__main__":
         if all_data['solar2car']==1:
             #turn off by now
             set_charger(0)
-        else
+        else:
             key='charger_setpoint'
             set_charger(10) 
             read_charger()
