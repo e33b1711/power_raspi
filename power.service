@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=openhabian
-ExecStart=/home/openhabian/power_raspi/wallbox.py
+ExecStart=/home/openhabian/power_raspi/power.py
 
 [Install]
 WantedBy=multi-user.target

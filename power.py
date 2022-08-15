@@ -322,6 +322,12 @@ if __name__ == "__main__":
         if all_data['solar2car']==1:
             #turn off by now
             set_charger(0)
+        else
+            key='charger_setpoint'
+            set_charger(10) 
+            read_charger()
+            client.publish(mqtt_state_prefix + key, all_data[key])
+            
         
         time.sleep(10)
         
