@@ -32,11 +32,13 @@ all_data = {
     'victron_connected':        0,    
     'victron_status':           -1,        
     'state_of_charge':          -1,
+    'battery_charge_limit':     0,
     'charger_power':            -1,        
     'charger_setpoint':         -1,
     'charger_connected':        0,
     'charger_status':           -1,
     'heat_connected':           -1,
+    
     #own data
     'solar2heat':               0,
     'solar2car':                0
@@ -50,7 +52,8 @@ victron_modbus = {
     'criticial_loads_power':    [23], 
     'victron_connected':        [],    
     'victron_status':           [844],        
-    'state_of_charge':          [843]
+    'state_of_charge':          [843],
+    'battery_charge_limit':     [2701]
 }    
 
 victron_unit = {
@@ -61,7 +64,8 @@ victron_unit = {
     'criticial_loads_power':    228, 
     'victron_connected':        100,    
     'victron_status':           100,        
-    'state_of_charge':          100
+    'state_of_charge':          100,
+    'battery_charge_limit':     100
 } 
 
 victron_scale = {
@@ -72,7 +76,8 @@ victron_scale = {
     'criticial_loads_power':    10, 
     'victron_connected':        1,    
     'victron_status':           1,        
-    'state_of_charge':          1
+    'state_of_charge':          1,
+    'battery_charge_limit':     1
 }       
 
 #charger stuff
@@ -191,7 +196,7 @@ def to_signed(unsigned):
 broker_address = "openhabianpi2.fritz.box"
 mqtt_state_prefix = "power_state/"
 client = mqtt.Client("P2")
-command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_control"];
+command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_setpoint"];
 
 
 def on_message(client, userdata, message):
@@ -213,14 +218,11 @@ def on_message(client, userdata, message):
         if all_data['solar2car']==0:
             read_charger()
             key='charger_setpoint'
-            if int(message.payload.decode("utf-8"))==1:
-                if all_data[key]<20:
-                    set_charger(all_data[key]+1)
-            if int(message.payload.decode("utf-8"))==0:
-                if all_data[key]>6:
-                    set_charger(all_data[key]-1)
-            read_charger()
-            client.publish(mqtt_state_prefix + key, all_data[key])
+            payload_val = int(message.payload.decode("utf-8"))
+            if payload_val>=6 and payload_val<=20:
+                set_charger(round(payload_val)) 
+                read_charger()
+                client.publish(mqtt_state_prefix + key, all_data[key])
         
    
 
@@ -251,8 +253,10 @@ def read_victron():
                 result =  client.read_input_registers(address=address, count=2, unit=unit)
                 #print(result)
                 all_data[key] += to_signed(result.registers[0])*scale
+                
         client.close()
         all_data['victron_connected'] = 1
+        
     except Exception as e:
         print(e)
         all_data['victron_connected'] = 0
@@ -277,20 +281,7 @@ def publish_mqtt():
 HOST                    = "192.168.178.222"  # The server's hostname or IP address
 PORT                    = 8888  # The port used by the server
 def update_heat(heat_setpoint):
-    global all_data
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            value = str(int(heat_setpoint))
-            send_string = b'!w!U_EL!' + value.encode('ASCII') + b'$\n'
-            #print(send_string)
-            s.sendall(send_string)
-            data = s.recv(1024)
-            #print(f"Received {data!r}")
-            all_data['heat_connected']  = 1
-    except:
-        all_data['heat_connected']  = 0
-        print("Could not connect to echo server!")
+    client.publish("ard_command/U_EL", round(heat_setpoint))
     
        
 
