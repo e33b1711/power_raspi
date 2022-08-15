@@ -203,11 +203,11 @@ def on_message(client, userdata, message):
     
     if message.topic==command_topics[0]:
         key = 'solar2heat'
-        all_data[key] = int(message.payload.decode("utf-8"))
+        all_data[key] = message.payload.decode("utf-8")
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[1]:
         key = 'solar2car'
-        all_data[key] = int(message.payload.decode("utf-8"))
+        all_data[key] = message.payload.decode("utf-8")
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[2]:
         if all_data['solar2car']==0:
@@ -307,14 +307,14 @@ if __name__ == "__main__":
         print_alldata()
         read_charger()
         
-        if all_data['solar2heat']==1:
+        if all_data['solar2heat']=="ON":
             #fix on by now
             heat_setpoint = 220  
         else:
             heat_setpoint = 0
         update_heat(heat_setpoint)
         
-        if all_data['solar2car']==1:
+        if all_data['solar2car']=="ON":
             #turn off by now
             set_charger(0)
         else:
