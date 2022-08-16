@@ -314,7 +314,8 @@ if __name__ == "__main__":
             heat_setpoint = 0
         update_heat(heat_setpoint)
         
-        if all_data['solar2car']=="ON":
+        disp("<<<" + all_data['solar2car'] +"<<<")
+        if all_data['solar2car']=="ON" or all_data['solar2car']=="1":
             disp("charger off")
             set_charger(0)
             
