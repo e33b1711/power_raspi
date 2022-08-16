@@ -40,7 +40,7 @@ all_data = {
     
     #own data
     'solar2heat':               0,
-    'solar2car':                0
+    'solar2car':                1
 }    
 
 victron_modbus = {
@@ -106,6 +106,7 @@ def signal_handler(sig, frame):
     all_data['solar2heat']  = 0
     all_data['solar2car']   = 0
     #set wallbox to 10A / start charging
+    set_charger(10)
     
     #publish mqtt control states
     read_victron()
