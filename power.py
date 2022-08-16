@@ -40,7 +40,7 @@ all_data = {
     
     #own data
     'solar2heat':               0,
-    'solar2car':                1
+    'solar2car':                "1"
 }    
 
 victron_modbus = {
@@ -153,6 +153,7 @@ def read_charger():
 
     
 def set_charger(setpoint):
+    print("setcharger: " + str(setpoint))
 
     try:
      
@@ -211,10 +212,11 @@ def on_message(client, userdata, message):
         all_data[key] = str(message.payload.decode("utf-8"))
         client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[2]:
-        if all_data['solar2car']==0:
+        if not(all_data['solar2car']=="ON" or all_data['solar2car']=="1"):
             read_charger()
             key='charger_setpoint'
             payload_val = int(message.payload.decode("utf-8"))
+            print(payload_val)
             if payload_val>=6 and payload_val<=20:
                 set_charger(round(payload_val)) 
                 read_charger()
