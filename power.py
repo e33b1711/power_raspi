@@ -315,13 +315,8 @@ if __name__ == "__main__":
         update_heat(heat_setpoint)
         
         if all_data['solar2car']=="ON":
-            #turn off by now
+            disp("charger off")
             set_charger(0)
-        else:
-            key='charger_setpoint'
-            set_charger(10) 
-            read_charger()
-            client.publish(mqtt_state_prefix + key, all_data[key])
             
         
         time.sleep(10)
