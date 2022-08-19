@@ -320,7 +320,7 @@ if __name__ == "__main__":
         print_alldata()
         read_charger()
         
-        if all_data['solar2heat']=="ON" or all_data['solar2car']=="1":
+        if all_data['solar2heat']=="ON" or all_data['solar2heat']=="1":
             #fix on by now
             heat_setpoint = 220  
         else:
