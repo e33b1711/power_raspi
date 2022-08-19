@@ -283,7 +283,7 @@ def update_heat(heat_setpoint):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((HOST, PORT))
             value = str(int(heat_setpoint))
-            send_string = b'!w!U_EL!' + value.encode('ASCII') + b'$\n'
+            send_string = b'!c!U_EL!' + value.encode('ASCII') + b'$\n'
             #print(send_string)
             s.sendall(send_string)
             data = s.recv(1024)
