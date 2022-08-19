@@ -277,9 +277,19 @@ def publish_mqtt():
         
 #set the pwm heating
 HOST                    = "192.168.178.222"  # The server's hostname or IP address
-PORT                    = 8888  # The port used by the server
+PORT                    = 8888  # The port used by the server   
 def update_heat(heat_setpoint):
-    client.publish("ard_command/U_EL", round(heat_setpoint))
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+            value = str(int(heat_setpoint))
+            send_string = b'!w!U_EL!' + value.encode('ASCII') + b'$\n'
+            #print(send_string)
+            s.sendall(send_string)
+            data = s.recv(1024)
+            #print(f"Received {data!r}")
+    except:
+        print("Could not connect to echo server!")
     
        
 
