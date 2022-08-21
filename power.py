@@ -39,8 +39,8 @@ all_data = {
     'heat_connected':           -1,
     
     #own data
-    'solar2heat':               0,
-    'solar2car':                "1"
+    'solar2heat':               "OFF",
+    'solar2car':                "OFF"
 }    
 
 victron_modbus = {
@@ -105,8 +105,7 @@ data_null = 'null'
 def signal_handler(sig, frame):
     all_data['solar2heat']  = 0
     all_data['solar2car']   = 0
-    #set wallbox to 10A / start charging
-    set_charger(10)
+
     
     #publish mqtt control states
     read_victron()
@@ -153,24 +152,39 @@ def read_charger():
 
     
 def set_charger(setpoint):
-    print("setcharger: " + str(setpoint))
-
+    print("================set_charger=========================") 
     try:
-     
         #set amps
-        if setpoint<6:
-            response = requests.put(url_stop, headers=headers, data=data_null)
-            response.raise_for_status()
-        else:
-            if setpoint <=20:
-                response = requests.put(url_start, headers=headers, data=data_null)
-                response.raise_for_status()
-                data = '{"current":' + str(int(setpoint)) + '000}'
-                response = requests.put(url_limit, headers=headers, data=data)
-                response.raise_for_status()
-      
+        data = '{"current":' + str(int(setpoint)) + '000}'
+        response = requests.put(url_limit, headers=headers, data=data)
+        response.raise_for_status()
         all_data['charger_connected']  = 1
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
         
+def charger_on():
+    print("================charger_on=========================") 
+    try:
+        response = requests.put(url_start, headers=headers, data=data_null)
+        response.raise_for_status()      
+        all_data['charger_connected']  = 1
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
+        
+def charger_off():
+    print("================charger_off=========================") 
+    try:
+        response = requests.put(url_stop, headers=headers, data=data_null)
+        response.raise_for_status()      
+        all_data['charger_connected']  = 1
     except HTTPError as http_err:
         all_data['charger_connected']  = 0
         print(f'HTTP error occurred: {http_err}')
@@ -190,10 +204,10 @@ def to_signed(unsigned):
 
 #mqtt stuff
 #state topics:  are just the dictonary names 
-broker_address = "openhabianpi2.fritz.box"
+broker_address = "localhost"
 mqtt_state_prefix = "power_state/"
 client = mqtt.Client("P2")
-command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_setpoint"];
+command_topics = ["power_command/solar2heat", "power_command/solar2car"];
 
 
 def on_message(client, userdata, message):
@@ -211,16 +225,6 @@ def on_message(client, userdata, message):
         key = 'solar2car'
         all_data[key] = message.payload.decode("utf-8")
         client.publish(mqtt_state_prefix + key, all_data[key])
-    if message.topic==command_topics[2]:
-        if not(all_data['solar2car']=="ON" or all_data['solar2car']=="1"):
-            read_charger()
-            key='charger_setpoint'
-            payload_val = int(message.payload.decode("utf-8"))
-            print(payload_val)
-            if payload_val>=6 and payload_val<=20:
-                set_charger(round(payload_val)) 
-                read_charger()
-                client.publish(mqtt_state_prefix + key, all_data[key])
         
    
 
@@ -278,20 +282,56 @@ def publish_mqtt():
 #set the pwm heating
 HOST                    = "192.168.178.222"  # The server's hostname or IP address
 PORT                    = 8888  # The port used by the server   
-def update_heat(heat_setpoint):
+heat_setpoint_local     = 0
+def update_heat(delta_power):
+    global heat_setpoint_local
+    heat_setpoint_local += round(delta_power *(220/3000)*0.5);
+    if heat_setpoint_local > 220:
+        heat_setpoint_local = 220
+    if heat_setpoint_local < 10:
+        heat_setpoint_local = 0
+        
+    print("========================================")
+    print("delta_power:          " + str(delta_power))
+    print("increment:            " +  str(round(delta_power *(220/3000)*0.2)))
+    print("heat_setpoint_local:  " + str(heat_setpoint_local))
+    print("=========================================")      
+    
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((HOST, PORT))
-            value = str(int(heat_setpoint))
+            value = str(int(heat_setpoint_local))
             send_string = b'!c!U_EL!' + value.encode('ASCII') + b'$\n'
             #print(send_string)
             s.sendall(send_string)
             data = s.recv(1024)
             #print(f"Received {data!r}")
-    except:
+    except Exception as e:
+        print(e)
         print("Could not connect to echo server!")
+
+
+
+def update_charger(power):
     
-       
+    setpoint =  round(power / 240)
+    if setpoint>20:
+        setpoint = 20
+    if setpoint<0:
+        setpoint = 0
+      
+    if round(setpoint)!=round(all_data['charger_setpoint']) and round(setpoint)>=6:
+        set_charger(setpoint)
+    
+    if setpoint>=6 and all_data['charger_status']==1:
+        charger_on()
+    if setpoint<4 and all_data['charger_status']==2:
+        charger_off()
+        
+    print("==================update_charger======================")
+    print("setpoint:               " + str(setpoint))
+    print("=========================================")      
+    
 
     
     
@@ -309,7 +349,8 @@ if __name__ == "__main__":
         client.subscribe(topic)
     
     #local variable not visible over mqtt
-    heat_setpoint   = 0
+    first               = 1
+    solar_power_mean    = 0
 
     while 1:
     
@@ -320,20 +361,40 @@ if __name__ == "__main__":
         print_alldata()
         read_charger()
         
-        if all_data['solar2heat']=="ON" or all_data['solar2heat']=="1":
-            #fix on by now
-            heat_setpoint = 220  
+        #calculate delta power
+        delta_power = 0;
+        if all_data['state_of_charge']>90:
+            delta_power = -1*all_data['grid_power'] - 1650/10*(100-int(all_data['state_of_charge'])) + all_data['battery_power']
         else:
-            heat_setpoint = 0
-        update_heat(heat_setpoint)
+            delta_power = -1*all_data['grid_power'] - 1650 + all_data['battery_power']
+            
+        #calculate mean solar power        
+        if first:
+            first=0
+            solar_power_mean = all_data['solar_power']
+        else:
+            solar_power_mean += 0.01*(all_data['solar_power']-solar_power_mean)        
+     
+        print("========================================");
+        print("delta_power:      " + str(delta_power));
+        print("solar_power_mean: " + str(solar_power_mean))
+        print("=========================================");      
+            
+            
+        
+        
+        if all_data['solar2heat']=="ON" or all_data['solar2heat']=="1":
+            update_heat(delta_power);
+
+        
+        
         
         
         if all_data['solar2car']=="ON" or all_data['solar2car']=="1":
-            print("charger off")
-            set_charger(0)
-            
+            update_charger(solar_power_mean-500)   #debug
+
         
-        time.sleep(10)
+        time.sleep(5)
         
         
         
