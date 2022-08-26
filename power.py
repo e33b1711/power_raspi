@@ -330,6 +330,7 @@ def publish_mqtt():
 HOST                    = "192.168.178.222"  # The server's hostname or IP address
 PORT                    = 8888  # The port used by the server   
 heat_setpoint_local     = 0
+last_sp_local 			= 0
 def update_heat(delta_power):
     global heat_setpoint_local
     heat_setpoint_local += round(delta_power *(220/3000)*0.5);
@@ -343,20 +344,22 @@ def update_heat(delta_power):
     print("increment:            " +  str(round(delta_power *(220/3000)*0.2)))
     print("heat_setpoint_local:  " + str(heat_setpoint_local))
     print("=========================================")      
-    
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            value = str(int(heat_setpoint_local))
-            send_string = b'!c!U_EL!' + value.encode('ASCII') + b'$\n'
-            #print(send_string)
-            s.sendall(send_string)
-            data = s.recv(1024)
-            #print(f"Received {data!r}")
-    except Exception as e:
-        print(e)
-        print("Could not connect to echo server!")
-
+   
+    if not(heat_setpoint_local == 0 and last_sp_local==0):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((HOST, PORT))
+                value = str(int(heat_setpoint_local))
+                send_string = b'!c!U_EL!' + value.encode('ASCII') + b'$\n'
+                #print(send_string)
+                s.sendall(send_string)
+                data = s.recv(1024)
+                #print(f"Received {data!r}")
+        except Exception as e:
+            print(e)
+            print("Could not connect to echo server!")
+		
+    last_sp_local = heat_setpoint_local
 
 
 def update_charger(power):
