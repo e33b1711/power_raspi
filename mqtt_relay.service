@@ -1,5 +1,5 @@
 [Unit]
-Description=wallbox pv control service
+Description=tcp echo to mqtt relay
 After=network.target
 StartLimitIntervalSec=0
 
