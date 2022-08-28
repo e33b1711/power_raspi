@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=e33b1711
-ExecStart=/home/e33b1711/power_raspi/power.py
+ExecStart=/home/e33b1711/power_raspi/mqtt_relay.py
 
 [Install]
 WantedBy=multi-user.target
