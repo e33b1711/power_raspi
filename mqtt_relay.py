@@ -52,8 +52,7 @@ if __name__ == "__main__":
     client.on_message=on_message
     client.connect(broker_address)
     client.loop_start() 
-    client.subscribe('ard_commmand/#')
-    client.subscribe('ard_state/#')
+    client.subscribe([("ard_state/#",1), ("ard_command/#",1)])
 
     #gracefull strg+c
     signal.signal(signal.SIGINT, signal_handler)
