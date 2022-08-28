@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import socket
 import sys
 import signal
@@ -30,7 +31,7 @@ def publish_mqtt(key, payload):
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Connect the socket to the port where the server is listening
-server_address = ('openhabianpi2.fritz.box', 8888)
+server_address = ('raspberrypi.fritz.box', 8888)
 print ('connecting to %s port %s' % server_address)
 sock.connect(server_address)
 
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     client.on_message=on_message
     client.connect(broker_address)
     client.loop_start() 
-    client.subscribe('#')
+    client.subscribe('ard_commmand/#')
 
     #gracefull strg+c
     signal.signal(signal.SIGINT, signal_handler)

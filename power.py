@@ -217,7 +217,7 @@ def to_signed(unsigned):
 #state topics:  are just the dictonary names 
 broker_address = "localhost"
 mqtt_state_prefix = "power_state/"
-client = mqtt.Client("P2")
+client = mqtt.Client("power_control")
 command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_setpoint", "power_command/charging"];
 
 
@@ -327,12 +327,13 @@ def publish_mqtt():
         
         
 #set the pwm heating
-HOST                    = "192.168.178.222"  # The server's hostname or IP address
+HOST                    = "192.168.178.23"  # The server's hostname or IP address
 PORT                    = 8888  # The port used by the server   
 heat_setpoint_local     = 0
 last_sp_local 			= 0
 def update_heat(delta_power):
     global heat_setpoint_local
+    global last_sp_local
     heat_setpoint_local += round(delta_power *(220/3000)*0.5);
     if heat_setpoint_local > 220:
         heat_setpoint_local = 220
