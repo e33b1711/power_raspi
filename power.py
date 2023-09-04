@@ -17,12 +17,28 @@ from requests.exceptions import HTTPError
 from requests.structures import CaseInsensitiveDict
 import signal
 import sys
+import subprocess
+import time
+
+
+# leaf stuff
+cmd             = "./query_leaf.exe"
+proc            = None
+last_update     = 0
+FIN             = "SJNFAAZE1U0151254"
 
 #victron stuff
 victron_host            = '192.168.178.144'
 
 all_data = {
     #collected data
+    'leaf_healthy':             -1,
+    'leaf_timestamp':           -1,
+    'leaf_connected':           -1,
+    'leaf_charging':            -1,
+    'leaf_SOC':                 -1,
+    'leaf_range':               -1,
+    #
     'grid_power':               -1,           
     'solar_power':              -1,           
     'battery_power':            -1,         
@@ -44,6 +60,60 @@ all_data = {
     'car_connected':            "OFF",
     'charging':                 "OFF"
 }    
+
+
+
+def handle_leaf():
+    global last_update
+    global proc
+    global cmd
+    global all_data
+    global FIN
+    
+    try:
+        if not(proc == None):
+            if not(proc.poll() is None):
+                #print(">>>>>>>")
+                #for i in range(8):
+                #    print(proc.stdout.readline().decode('utf-8'))
+                #print(">>>>>>>")
+                if FIN == proc.stdout.readline().decode('utf-8').strip():
+                    all_data['leaf_healthy'] =       1
+                    all_data['leaf_timestamp'] =     proc.stdout.readline().decode('utf-8').strip()
+                    if proc.stdout.readline().decode('utf-8').strip() == "true":
+                        all_data['leaf_connected'] =     1
+                    else:
+                        all_data['leaf_connected'] =     0
+                    if proc.stdout.readline().decode('utf-8').strip() == "true":
+                        all_data['leaf_charging'] =     1
+                    else:
+                        all_data['leaf_charging'] =     0     
+                    all_data['leaf_SOC'] =           int(proc.stdout.readline().decode('utf-8').strip())
+                    all_data['leaf_range'] =         int(proc.stdout.readline().decode('utf-8').strip())
+                else:
+                    all_data['leaf_healthy'] =       0
+                proc.kill()
+                proc = None
+                print(">>>>>>>> killed leaf task.")
+            if last_update+60 < int(time.time()):  #TODO set to 5 min
+                proc.kill()
+                proc = None
+                print(">>>>>>>> ERROR: killed leaf task before it returned.")
+                all_data['leaf_healthy'] =       0
+                
+        else:
+            if last_update+60 < int(time.time()):  #TODO set to 5 min
+                proc            = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                last_update     = int(time.time())
+                print(">>>>>>>> created leaf task.")
+    except Exception as err:
+        print(">>>>>>> caugth error in leaf handler")
+        print(f'Other error occurred: {err}')
+        proc = None
+        all_data['leaf_healthy'] = 0
+        last_update = 0 
+        
+    
 
 victron_modbus = {
     'grid_power':               [820, 821, 822],           
@@ -408,6 +478,7 @@ if __name__ == "__main__":
         #read infos
         read_victron()
         read_charger()
+        handle_leaf()
         
         if all_data['charger_status']==0:
             all_data['car_connected']=0
