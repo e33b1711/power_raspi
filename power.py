@@ -85,7 +85,7 @@ victron_scale = {
 charger_keys = {
     'power':                        'charger_power',        
     'allowed_charging_current':     'charger_setpoint',        
-    'vehicle_state':                'charger_status'        
+    'charger_state':                'charger_status'        
 }
 
 charger_scale = {
