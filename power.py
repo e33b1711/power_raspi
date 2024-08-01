@@ -101,7 +101,7 @@ url_auto_start  = 'http://192.168.178.43/evse/auto_start_charging'
 
 
 
-url_limit = 'http://192.168.178.43/evse/current_limit'
+url_limit = 'http://192.168.178.43/evse/external_current'
 url_stop = 'http://192.168.178.43/evse/stop_charging'
 url_start = 'http://192.168.178.43/evse/start_charging'
 headers = CaseInsensitiveDict()
