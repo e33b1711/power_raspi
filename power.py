@@ -166,6 +166,7 @@ charger_scale = {
 
 url_meter       = 'http://192.168.178.43/meter/state'
 url_controller  = 'http://192.168.178.43/evse/state'
+url_auto_start  = 'http://192.168.178.43/evse/auto_start_charging'
 
 
 
@@ -199,7 +200,21 @@ def signal_handler(sig, frame):
     print('Exit...')
     sys.exit(0)
     
-    
+
+def init_charger():
+    # curl http://$HOST/evse/auto_start_charging -d '{ "auto_start_charging": true }'
+    print("================charger_auto_start_off=========================") 
+    data = '{ "auto_start_charging": false }'
+    try:
+        response = requests.put(url_auto_start, headers=headers, data=data_null)
+        response.raise_for_status()      
+        all_data['charger_connected']  = 1
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
 
 def read_charger():
     try:
@@ -473,6 +488,9 @@ if __name__ == "__main__":
     first               = 1
     solar_power_mean    = 0
 
+    #
+    init_charger()
+
     while 1:
     
         #read infos
@@ -532,8 +550,8 @@ if __name__ == "__main__":
         else:
             #charge from the grid / dont drain the battery
             if abs(all_data['charger_power'] - all_data['ess_setpoint'])>200:
-                victron_setpoint(int(all_data['charger_power']))
-
+                # victron_setpoint(int(all_data['charger_power']))
+                pass
         
         time.sleep(5)
         
