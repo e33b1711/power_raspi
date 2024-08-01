@@ -85,7 +85,7 @@ victron_scale = {
 charger_keys = {
     'power':                        'charger_power',        
     'allowed_charging_current':     'charger_setpoint',        
-    'vehicle_state':                'charger_status'        
+    'charger_state':                'charger_status'        
 }
 
 charger_scale = {
@@ -94,7 +94,7 @@ charger_scale = {
     'charger_status':       1        
 }
 
-url_meter       = 'http://192.168.178.43/meter/state'
+url_meter       = 'http://192.168.178.43/meter/values'
 url_controller  = 'http://192.168.178.43/evse/state'
 url_auto_start  = 'http://192.168.178.43/evse/auto_start_charging'
 
