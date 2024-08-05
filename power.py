@@ -107,6 +107,7 @@ url_start = 'http://192.168.178.43/evse/start_charging'
 headers = CaseInsensitiveDict()
 headers["Content-Type"] = "application/json"
 data_null = 'null'
+MAX_CHARGER_SETPOINT = 32
 
 def signal_handler(sig, frame):
     all_data['solar2heat']  = 0
@@ -381,7 +382,7 @@ def update_heat(delta_power):
 def update_charger(power):
     
     setpoint =  round(power / 240)
-    if setpoint>20:
+    if setpoint>MAX_CHARGER_SETPOINT:
         setpoint = 20
     if setpoint<0:
         setpoint = 0
@@ -473,7 +474,7 @@ if __name__ == "__main__":
         
         
         if all_data['solar2car']=="ON" or all_data['solar2car']=="1":
-            update_charger(solar_power_mean-500)   #debug
+            update_charger(solar_power_mean*0.9)   #debug
             if all_data['ess_setpoint'] !=0:
                     victron_setpoint(0)
         else:
