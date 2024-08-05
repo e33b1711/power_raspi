@@ -383,7 +383,7 @@ def update_charger(power):
     
     setpoint =  round(power / 240)
     if setpoint>MAX_CHARGER_SETPOINT:
-        setpoint = 20
+        setpoint = MAX_CHARGER_SETPOINT
     if setpoint<0:
         setpoint = 0
       
