@@ -97,6 +97,7 @@ charger_scale = {
 url_meter       = 'http://192.168.178.43/meter/values'
 url_controller  = 'http://192.168.178.43/evse/state'
 url_auto_start  = 'http://192.168.178.43/evse/auto_start_charging'
+url_external    =  'http://192.168.178.43/evse/external_enabled'
 
 
 
@@ -138,6 +139,18 @@ def init_charger():
     data = '{ "auto_start_charging": false }'
     try:
         response = requests.put(url_auto_start, headers=headers, data=data)
+        response.raise_for_status()      
+        all_data['charger_connected']  = 1
+    except HTTPError as http_err:
+        all_data['charger_connected']  = 0
+        print(f'HTTP error occurred: {http_err}')
+    except Exception as err:
+        all_data['charger_connected']  = 0
+        print(f'Other error occurred: {err}')
+    print("================charger_external_control=========================") 
+    data = '{ "enabled": true }'
+    try:
+        response = requests.put(url_external, headers=headers, data=data)
         response.raise_for_status()      
         all_data['charger_connected']  = 1
     except HTTPError as http_err:
