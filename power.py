@@ -275,15 +275,12 @@ def on_message(client, userdata, message):
             client.publish(mqtt_state_prefix + key, all_data[key])
     if message.topic==command_topics[3]:
         if not(all_data['solar2car']=="ON" or all_data['solar2car']=="1"):
-            key='charging'
             payload_val = message.payload.decode("utf-8")
             print(payload_val)
             if payload_val=="ON" or payload_val=='1': 
                 charger_on()
             if payload_val=="OFF" or payload_val=='0': 
                 charger_off()    
-            read_charger()
-            client.publish(mqtt_state_prefix + key, all_data[key])
         
    
 
