@@ -441,14 +441,15 @@ if __name__ == "__main__":
         read_victron()
         read_charger()
         
-        if all_data['charger_status']==0:
+        c_status = all_data['charger_status']
+        if c_status==0:
             all_data['car_connected']=0
             all_data['charging']="OFF"
             all_data['solar2car']=="ON"
-        if all_data['charger_status']==1:
+        if c_status==1 or c_status==2:
             all_data['car_connected']=1
             all_data['charging']="OFF"
-        if all_data['charger_status']==2:
+        if all_data['charger_status']==3:
             all_data['car_connected']=1
             all_data['charging']="ON"
         
