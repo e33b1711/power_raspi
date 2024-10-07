@@ -400,9 +400,9 @@ def update_charger(power):
     if round(setpoint)!=round(all_data['charger_setpoint']) and round(setpoint)>=6:
         set_charger(setpoint)
     
-    if setpoint>=6 and all_data['charger_status']==1:
+    if setpoint>=6 and all_data['charger_status']==2:
         charger_on()
-    if setpoint<4 and all_data['charger_status']==2:
+    if setpoint<4 and all_data['charger_status']==3:
         charger_off()
         
     print("==================update_charger======================")
