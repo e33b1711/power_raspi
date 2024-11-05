@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-
-#TODO
-#wallbox get infos      (x)
-#wallbox set            (x)
-#heat set               (x)
-#mqtt receive           (x)
-#algo                   ()
-
-
-import socket
+"""Controls PV charger and electric heater, interfaces to openhab via mqtt"""
 import time
-import paho.mqtt.client as mqtt
-from pymodbus.client.sync import ModbusTcpClient
-import requests
-from requests.exceptions import HTTPError
-from requests.structures import CaseInsensitiveDict
 import signal
 import sys
+import logging
+import math
 
-#victron stuff
-victron_host            = '192.168.178.144'
+from lib.victron import read_victron, MAX_BATT_IN_POWER
+from lib.warp_charger import charger_on, charger_off, read_charger
+from lib.warp_charger import update_charger, init_charger, set_charger
+from lib.mqtt import mqtt_publish, mqtt_init, COMMAND_TOPICS, mqtt_stop
+from lib.pwm_heating import set_heat, POWER_2_PWM, MAX_SETPOINT, MIN_SETPOINT
+
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# TODO CLI
+# TODO how to recover mqtt?
+
+INTERVAL = 5
+
+ON_VALS = ['ON', '1']
+OFF_VALS = ['OFF', '0']
 
 all_data = {
     #collected data
@@ -29,474 +32,214 @@ all_data = {
     'loads_power':              -1,           
     'criticial_loads_power':    -1,
     'ess_setpoint':             0,
-    'victron_connected':        0,    
     'victron_status':           -1,        
     'state_of_charge':          -1,
     'charger_power':            -1,        
     'charger_setpoint':         -1,
-    'charger_connected':        0,
     'charger_status':           -1,
     'heat_connected':           -1,
-    
     #own data
+    'heat_conneted':            0,
+    'victron_connected':        0,   
+    'charger_connected':        0,
+    'delta_power':              None,
+    'heat_setpoint':            0,             
+    'solar_power_mean':         None,
     'solar2heat':               "OFF",
     'solar2car':                "OFF",
     'car_connected':            "OFF",
-    'charging':                 "OFF"
-}    
-
-victron_modbus = {
-    'grid_power':               [820, 821, 822],           
-    'solar_power':              [811, 812, 813],           
-    'battery_power':            [842],         
-    'loads_power':              [817, 818, 819],            
-    'criticial_loads_power':    [23], 
-    'ess_setpoint':             [2700],
-    'victron_connected':        [],    
-    'victron_status':           [844],        
-    'state_of_charge':          [843]
-}    
-
-victron_unit = {
-    'grid_power':               100,           
-    'solar_power':              100,           
-    'battery_power':            100,         
-    'loads_power':              100,            
-    'criticial_loads_power':    228,
-    'ess_setpoint':             100,    
-    'victron_connected':        100,    
-    'victron_status':           100,        
-    'state_of_charge':          100
-} 
-
-victron_scale = {
-    'grid_power':               1,           
-    'solar_power':              1,           
-    'battery_power':            1,         
-    'loads_power':              1,            
-    'criticial_loads_power':    10,
-    'ess_setpoint':             1,     
-    'victron_connected':        1,    
-    'victron_status':           1,        
-    'state_of_charge':          1
-}       
-
-#charger stuff
-charger_keys = {
-    'power':                        'charger_power',        
-    'allowed_charging_current':     'charger_setpoint',        
-    'charger_state':                'charger_status'        
+    'charging':                 "OFF",
+    'last_update':              None
 }
 
-charger_scale = {
-    'charger_power':        1,        
-    'charger_setpoint':     0.001,        
-    'charger_status':       1        
-}
-
-url_meter       = 'http://192.168.178.43/meter/values'
-url_controller  = 'http://192.168.178.43/evse/state'
-url_auto_start  = 'http://192.168.178.43/evse/auto_start_charging'
-url_external    =  'http://192.168.178.43/evse/external_enabled'
-
-
-
-
-url_limit = 'http://192.168.178.43/evse/external_current'
-url_stop = 'http://192.168.178.43/evse/stop_charging'
-url_start = 'http://192.168.178.43/evse/start_charging'
-headers = CaseInsensitiveDict()
-headers["Content-Type"] = "application/json"
-data_null = 'null'
-MAX_CHARGER_SETPOINT = 32
 
 def signal_handler(sig, frame):
-    all_data['solar2heat']  = 0
-    all_data['solar2car']   = 0
+    """Handle exit gracefully"""
 
-    #set ess setpoint to 0
-    victron_setpoint(0)
-    
-    #turn off charger set to 10A
+    #disconnected / turned off
+    data = {}
+    data['solar2heat']  = 0
+    data['solar2car']   = 0
+    data['charger_connected']  = 0
+    data['victron_connected']  = 0
+    data['heat_connected']  = 0
+
+    #turn off charger
     charger_off()
-    set_charger(10)
-    
+
     #publish mqtt control states
-    read_victron()
-    read_charger()
-    all_data['charger_connected']  = 0
-    all_data['victron_connected']  = 0
-    all_data['heat_connected']  = 0
-    publish_mqtt()
-    
-    print('Exit...')
+    mqtt_publish(data)
+    mqtt_stop()
+
+    logger.info("Goodbye")
     sys.exit(0)
-    
-
-def init_charger():
-    # curl http://$HOST/evse/auto_start_charging -d '{ "auto_start_charging": true }'
-    print("================charger_auto_start_off=========================") 
-    data = '{ "auto_start_charging": false }'
-    try:
-        response = requests.put(url_auto_start, headers=headers, data=data)
-        response.raise_for_status()      
-        all_data['charger_connected']  = 1
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
-    print("================charger_external_control=========================") 
-    data = '{ "enabled": true }'
-    try:
-        response = requests.put(url_external, headers=headers, data=data)
-        response.raise_for_status()      
-        all_data['charger_connected']  = 1
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
-
-def read_charger():
-    try:
-        
-        response = requests.get(url_meter)
-        response.raise_for_status()
-        jsonResponse = response.json()
-        for key, value in jsonResponse.items():
-            #print(key, ":", value)
-            for rev_key in charger_keys:
-                if key == rev_key:
-                    all_data[charger_keys[rev_key]] = value*charger_scale[charger_keys[rev_key]]
-
-        response = requests.get(url_controller)
-        response.raise_for_status()
-        jsonResponse = response.json()
-        for key, value in jsonResponse.items():
-            #print(key, ":", value)
-            for rev_key in charger_keys:
-                if key == rev_key:
-                    all_data[charger_keys[rev_key]] = value*charger_scale[charger_keys[rev_key]]
-      
-        all_data['charger_connected']  = 1
-        
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
-
-    
-def set_charger(setpoint):
-    print("================set_charger=========================") 
-    try:
-        #set amps
-        data = '{"current":' + str(int(setpoint)) + '000}'
-        response = requests.put(url_limit, headers=headers, data=data)
-        response.raise_for_status()
-        all_data['charger_connected']  = 1
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
-        
-def charger_on():
-    print("================charger_on=========================") 
-    try:
-        response = requests.put(url_start, headers=headers, data=data_null)
-        response.raise_for_status()      
-        all_data['charger_connected']  = 1
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
-        
-def charger_off():
-    print("================charger_off=========================") 
-    try:
-        response = requests.put(url_stop, headers=headers, data=data_null)
-        response.raise_for_status()      
-        all_data['charger_connected']  = 1
-    except HTTPError as http_err:
-        all_data['charger_connected']  = 0
-        print(f'HTTP error occurred: {http_err}')
-    except Exception as err:
-        all_data['charger_connected']  = 0
-        print(f'Other error occurred: {err}')
 
 
-def to_signed(unsigned):
-    if unsigned>2**15:
-        return int(unsigned)-int(2**16)
-    else:
-        return int(unsigned)
-
-
-
-
-#mqtt stuff
-#state topics:  are just the dictonary names 
-broker_address = "localhost"
-mqtt_state_prefix = "power_state/"
-client = mqtt.Client("power_control")
-command_topics = ["power_command/solar2heat", "power_command/solar2car", "power_command/charger_setpoint", "power_command/charging"];
-
-
-def on_message(client, userdata, message):
-    print("message received " ,str(message.payload.decode("utf-8")))
-    print("message topic=",message.topic)
-    print("message qos=",message.qos)
-    print("message retain flag=",message.retain)
+def callback_set_flag(client, userdata, message):
+    """Get mqtt messages"""
     payload = str(message.payload.decode("utf-8"))
-    
-    if message.topic==command_topics[0]:
-        key = 'solar2heat'
-        all_data[key] = message.payload.decode("utf-8")
-        client.publish(mqtt_state_prefix + key, all_data[key])
-    if message.topic==command_topics[1]:
-        key = 'solar2car'
-        all_data[key] = message.payload.decode("utf-8")
-        client.publish(mqtt_state_prefix + key, all_data[key])
-    if message.topic==command_topics[2]:
-        if not(all_data['solar2car']=="ON" or all_data['solar2car']=="1"):
-            key='charger_setpoint'
-            payload_val = int(message.payload.decode("utf-8"))
-            print(payload_val)
-            set_charger(round(payload_val)) 
-            read_charger()
-            client.publish(mqtt_state_prefix + key, all_data[key])
-    if message.topic==command_topics[3]:
-        if not(all_data['solar2car']=="ON" or all_data['solar2car']=="1"):
-            payload_val = message.payload.decode("utf-8")
-            print(payload_val)
-            if payload_val=="ON" or payload_val=='1': 
-                charger_on()
-            if payload_val=="OFF" or payload_val=='0': 
-                charger_off()    
-        
-   
-
-def to_signed(unsigned):
-    if unsigned>2**15:
-        return int(unsigned)-int(2**16)
-    else:
-        return int(unsigned)
-        
-    
-#get the pv power / the power of the heating / the SOC form victron
-def victron_setpoint(setpoint):
-    try:
-        client = ModbusTcpClient(victron_host)
-        key         = "ess_setpoint"
-        address     = victron_modbus[key]
-        unit = victron_unit[key]
-        client.write_register(address=address[0], unit=unit, value=setpoint)
-        client.close()
-        all_data['victron_connected'] = 1
-        
-    except Exception as e:
-        print(e)
-        all_data['victron_connected'] = 0
-        print("Error: Could not connect to victron!")    
-    
-    #print("====update_victron===")
-
-def read_victron():
-    global all_data
-    global victron_modbus  
-
-    #print("====update_victron===")    
-
-    try:
-        client = ModbusTcpClient(victron_host)
-        
-        for key in victron_modbus.keys():
-            #print(key)
-            all_data[key]=0
-            for address in victron_modbus[key]:
-                unit = victron_unit[key]
-                scale = victron_scale[key]
-                #print(str(address) + " / " + str(unit))
-                result =  client.read_input_registers(address=address, count=2, unit=unit)
-                #print(result)
-                all_data[key] += to_signed(result.registers[0])*scale
-                
-        client.close()
-        all_data['victron_connected'] = 1
-        
-    except Exception as e:
-        print(e)
-        all_data['victron_connected'] = 0
-        print("Error: Could not connect to victron!")    
-    
-    #print("====update_victron===")
-        
-        
-def print_alldata():
-    print("====print_alldata===")
-    for key in all_data.keys():
-        print(key + ":" + str(all_data[key]))
-    print("====print_alldata===")
-        
-
-def publish_mqtt():
-    for key in all_data.keys():
-        client.publish(mqtt_state_prefix + key, all_data[key])
-        
-        
-#set the pwm heating
-HOST                    = "192.168.178.23"  # The server's hostname or IP address
-PORT                    = 8888  # The port used by the server   
-heat_setpoint_local     = 0
-last_sp_local 			= 0
-def update_heat(delta_power):
-    global heat_setpoint_local
-    global last_sp_local
-    heat_setpoint_local += round(delta_power *(220/3000)*0.5);
-    if heat_setpoint_local > 220:
-        heat_setpoint_local = 220
-    if heat_setpoint_local < 10:
-        heat_setpoint_local = 0
-        
-    print("========================================")
-    print("delta_power:          " + str(delta_power))
-    print("increment:            " +  str(round(delta_power *(220/3000)*0.2)))
-    print("heat_setpoint_local:  " + str(heat_setpoint_local))
-    print("=========================================")      
-   
-    if not(heat_setpoint_local == 0 and last_sp_local==0):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((HOST, PORT))
-                value = str(int(heat_setpoint_local))
-                send_string = b'!c!U_EL!' + value.encode('ASCII') + b'$\n'
-                #print(send_string)
-                s.sendall(send_string)
-                data = s.recv(1024)
-                #print(f"Received {data!r}")
-        except Exception as e:
-            print(e)
-            print("Could not connect to echo server!")
-		
-    last_sp_local = heat_setpoint_local
+    logger.info("mqtt calback set_flag %s %s", message.topic, str(payload))
+    for key in all_data:
+        if key in message.topic:
+            all_data[key] = payload
 
 
-def update_charger(power):
-    
-    setpoint =  round(power / 240)
-    if setpoint>MAX_CHARGER_SETPOINT:
-        setpoint = MAX_CHARGER_SETPOINT
-    if setpoint<0:
-        setpoint = 0
-      
-    if round(setpoint)!=round(all_data['charger_setpoint']) and round(setpoint)>=6:
-        set_charger(setpoint)
-    
-    if setpoint>=6 and all_data['charger_status']==2:
-        charger_on()
-    if setpoint<4 and all_data['charger_status']==3:
-        charger_off()
-        
-    print("==================update_charger======================")
-    print("setpoint:               " + str(setpoint))
-    print("=========================================")      
-    
-
-    
-    
-if __name__ == "__main__":
-
-    #gracefull strg+c
-    signal.signal(signal.SIGINT, signal_handler)
-       
-
-    #mqtt
-    client.on_message=on_message
-    client.connect(broker_address)
-    client.loop_start() 
-    for topic in command_topics:
-        client.subscribe(topic)
-    
-    #local variable not visible over mqtt
-    first               = 1
-    solar_power_mean    = 0
-
-    #
-    init_charger()
-
-    while 1:
-    
-        #read infos
-        read_victron()
+def call_back_set_charger(client, userdata, message):
+    """Get mqtt messages"""
+    payload_val = int(message.payload.decode("utf-8"))
+    if all_data['solar2car'] not in ON_VALS:
+        logger.info("mqtt calback set charger: %s", str(payload_val))
+        set_charger(round(payload_val))
         read_charger()
-        
-        c_status = all_data['charger_status']
-        if c_status==0:
-            all_data['car_connected']=0
-            all_data['charging']="OFF"
-            all_data['solar2car']=="ON"
-        if c_status==1 or c_status==2:
+        mqtt_publish(all_data)
+    else:
+        logger.info("mqtt calback set charger: %s [blocked by solar2car]", str(payload_val))
+
+
+def call_back_switch_charger(client, userdata, message):
+    """Get mqtt messages"""
+    payload_val = message.payload.decode("utf-8")
+    if all_data['solar2car'] not in ON_VALS:
+        logger.info("mqtt calback switch charger: %s", str(payload_val))
+        if payload_val in OFF_VALS:
+            charger_off()
+        if payload_val in ON_VALS:
+            charger_on()
+        read_charger()
+        mqtt_publish(all_data)
+    else:
+        logger.info("mqtt calback switch charger: %s [blocked by solar2car]" , str(payload_val))
+
+
+def calc_aux_power():
+    """Calc some auxilary power values"""
+     #calculate delta power (give battery in power priority)
+    if all_data['state_of_charge']>90:
+        batt_in_power =  MAX_BATT_IN_POWER/10*(100-int(all_data['state_of_charge']))
+    else:
+        batt_in_power =  MAX_BATT_IN_POWER
+    all_data['delta_power'] = -1*all_data['grid_power'] - batt_in_power + all_data['battery_power']
+
+    #calculate mean solar power       
+    if all_data['solar_power_mean']:
+        all_data['solar_power_mean'] += 0.01*(all_data['solar_power']-all_data['solar_power_mean'])
+    else:
+        all_data['solar_power_mean'] = all_data['solar_power']
+    # set to 0 eventually
+    if all_data['solar_power_mean']<10 and all_data['solar_power']==0:
+        all_data['solar_power_mean'] = 0.0
+
+
+def charger_control():
+    """Charger control algorithm"""
+    #translate status to flags
+    match all_data['charger_status']:
+        case 1 | 2:
             all_data['car_connected']=1
             all_data['charging']="OFF"
-        if all_data['charger_status']==3:
+        case 3:
             all_data['car_connected']=1
             all_data['charging']="ON"
-        
-        
-        publish_mqtt()
-        print_alldata()
-        read_charger()
-        
-        #calculate delta power
-        delta_power = 0;
-        if all_data['state_of_charge']>90:
-            delta_power = -1*all_data['grid_power'] - 1650/10*(100-int(all_data['state_of_charge'])) + all_data['battery_power']
-        else:
-            delta_power = -1*all_data['grid_power'] - 1650 + all_data['battery_power']
-            
-        #calculate mean solar power        
-        if first:
-            first=0
-            solar_power_mean = all_data['solar_power']
-        else:
-            solar_power_mean += 0.01*(all_data['solar_power']-solar_power_mean)        
-     
-        print("========================================");
-        print("delta_power:      " + str(delta_power));
-        print("solar_power_mean: " + str(solar_power_mean))
-        print("=========================================");      
-            
-            
-        
-        
-        if all_data['solar2heat']=="ON" or all_data['solar2heat']=="1":
-            update_heat(delta_power);
+        case _:
+            all_data['car_connected']=0
+            all_data['charging']="OFF"
 
-        
-        
-        
-        
-        if all_data['solar2car']=="ON" or all_data['solar2car']=="1":
-            update_charger(solar_power_mean*0.9)   #debug
-            if all_data['ess_setpoint'] !=0:
-                    victron_setpoint(0)
+    #pv power controll
+    if all_data['solar2car'] in ON_VALS:
+        charger_update = all_data['solar_power_mean']*0.9
+        update_charger(charger_update)
+        logger.info("Update charger: %s", str(charger_update))
+
+
+def cut_off(data, lower):
+    """Set to Zero on lower bound."""
+    if data < lower:
+        return 0
+    return data
+
+
+def heat_control():
+    """Heat control algorithm"""
+    if all_data['solar2heat'] in ON_VALS:
+        last_sp = all_data['heat_setpoint']
+        increment = math.ceil(all_data['delta_power'] * POWER_2_PWM * 0.5)
+
+        #start late at 30
+        if all_data['heat_setpoint'] == 0:
+            all_data['heat_setpoint'] = increment
         else:
-            #charge from the grid / dont drain the battery
-            if abs(all_data['charger_power'] - all_data['ess_setpoint'])>200:
-                # victron_setpoint(int(all_data['charger_power']))
-                pass
-        
-        time.sleep(5)
-        
-        
-        
-        
-        
+            all_data['heat_setpoint'] += increment
+
+        #limit
+        all_data['heat_setpoint'] = min(all_data['heat_setpoint'], MAX_SETPOINT)
+        #cut off
+        all_data['heat_setpoint'] = cut_off(all_data['heat_setpoint'], MIN_SETPOINT)
+
+        logger.info("New heat setpoint: %s", str(all_data['heat_setpoint']))
+
+        #write 0 only once
+        if not(last_sp == 0 and all_data['heat_setpoint']==0):
+            if set_heat(all_data['heat_setpoint']):
+                all_data['heat_conneted'] = 1
+            else:
+                all_data['heat_conneted'] = 0
+
+    #heat off by timeout in heat controller
+
+
+def get_victron():
+    """read victron => update all data"""
+    result = read_victron()
+    if not result:
+        all_data['victron_connected'] = 0
+    else:
+        all_data['victron_connected'] = 1
+    for key, val in result.items():
+        all_data[key] = val
+
+def get_charger():
+    """read charger =>  update all data"""
+    result = read_charger()
+    if not result:
+        all_data['charger_connected'] = 0
+    else:
+        all_data['charger_connected'] = 1
+    for key, val in result.items():
+        all_data[key] = val
+
+
+def kill_some_time():
+    """Call me to kill the reamining interval."""
+    if not all_data['last_update']:
+        #init
+        all_data['last_update'] = time.time()
+    else:
+        #wait 
+        while time.time() < all_data['last_update']  + INTERVAL:
+            time.sleep(0.1)
+        all_data['last_update'] += 5
+    logger.debug("End of loop. %s", str(all_data['last_update']))
+
+
+def main():
+    """Main loop and init"""
+
+    signal.signal(signal.SIGINT, signal_handler)
+    mqtt_init(COMMAND_TOPICS, [callback_set_flag, callback_set_flag, call_back_set_charger,
+                call_back_switch_charger], broker = "whiplash.fritz.box")
+    init_charger()
+
+    logger.info("Init done.")
+
+    while True:
+
+        kill_some_time()
+        get_victron()
+        get_charger()
+        calc_aux_power()
+        charger_control()
+        heat_control()
+        mqtt_publish(all_data)
+ 
+if __name__ == "__main__":
+    main()
