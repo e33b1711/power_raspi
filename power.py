@@ -2,6 +2,7 @@
 """Controls PV charger and electric heater, interfaces to openhab via mqtt"""
 import time
 import signal
+import argparse
 import sys
 import logging
 import math
@@ -14,13 +15,8 @@ from lib.pwm_heating import set_heat, POWER_2_PWM, MAX_SETPOINT, MIN_SETPOINT
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# TODO CLI
-# TODO how to recover mqtt?
 
 INTERVAL = 5
-
 ON_VALS = ['ON', '1']
 OFF_VALS = ['OFF', '0']
 
@@ -90,8 +86,7 @@ def call_back_set_charger(client, userdata, message):
     if all_data['solar2car'] not in ON_VALS:
         logger.info("mqtt calback set charger: %s", str(payload_val))
         set_charger(round(payload_val))
-        read_charger()
-        mqtt_publish(all_data)
+        mqtt_publish(get_charger())
     else:
         logger.info("mqtt calback set charger: %s [blocked by solar2car]", str(payload_val))
 
@@ -105,8 +100,7 @@ def call_back_switch_charger(client, userdata, message):
             charger_off()
         if payload_val in ON_VALS:
             charger_on()
-        read_charger()
-        mqtt_publish(all_data)
+        mqtt_publish(get_charger())
     else:
         logger.info("mqtt calback switch charger: %s [blocked by solar2car]" , str(payload_val))
 
@@ -200,12 +194,17 @@ def get_victron():
 def get_charger():
     """read charger =>  update all data"""
     result = read_charger()
+    ret_dict = {}
     if not result:
         all_data['charger_connected'] = 0
+        logger.error("Cant reach chrager")
     else:
         all_data['charger_connected'] = 1
     for key, val in result.items():
+        logger.debug("read charger: %s %s", key, str(val))
         all_data[key] = val
+        ret_dict[key] = val
+    return ret_dict
 
 
 def kill_some_time():
@@ -241,5 +240,13 @@ def main():
         heat_control()
         mqtt_publish(all_data)
  
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument( '-log',
+                     '--loglevel',
+                     default='warning',
+                     help='Provide logging level. Example --loglevel debug, default=warning' )
+    args = parser.parse_args()
+    logger.setLevel(level=args.loglevel.upper() )
     main()
