@@ -90,7 +90,7 @@ def read_charger():
     for key, value in response.items():
         for old_key, new_key in charger_keys.items():
             if key==old_key:
-                ret_val[new_key] = value
+                ret_val[new_key] = int(value * charger_scale[new_key])
     return ret_val
 
 
