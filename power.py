@@ -186,8 +186,8 @@ def get_victron():
     result = read_victron()
     if not result:
         all_data['victron_connected'] = 0
-    else:
-        all_data['victron_connected'] = 1
+        return
+    all_data['victron_connected'] = 1
     for key, val in result.items():
         all_data[key] = val
 
@@ -198,8 +198,8 @@ def get_charger():
     if not result:
         all_data['charger_connected'] = 0
         logger.error("Cant reach chrager")
-    else:
-        all_data['charger_connected'] = 1
+        return None
+    all_data['charger_connected'] = 1
     for key, val in result.items():
         logger.debug("read charger: %s %s", key, str(val))
         all_data[key] = val
