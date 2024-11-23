@@ -62,6 +62,7 @@ def signal_handler(sig, frame):
 
     #turn off charger
     charger_off()
+    mqtt_publish(get_charger())
 
     #publish mqtt control states
     mqtt_publish(data)
