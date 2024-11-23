@@ -115,6 +115,7 @@ def update_charger(power):
     """Set charger max power with some hystereses"""
     #calculate set point (current)
     setpoint =  max(min(round(power / 240), MAX_CURRENT), 0)
+    logger.info("update_charger, setpoint %s", str(setpoint))
 
     if setpoint>=MIN_CURRENT:
         charger_on()
