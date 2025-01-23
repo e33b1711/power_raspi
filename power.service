@@ -1,5 +1,5 @@
 [Unit]
-Description=wallbox pv control service
+Description=tcp echo to mqtt relay
 After=network.target
 StartLimitIntervalSec=0
 
@@ -7,8 +7,11 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=1
-User=e33b1711
-ExecStart=/home/e33b1711/power_raspi/power.py
+User=ak
+WorkingDirectory=/home/ak/power_raspi
+Environment=PYTHONPATH=/home/ak/power_raspi
+ExecStart=/home/ak/power_raspi/venv/bin/python power.py
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

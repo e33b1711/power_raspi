@@ -7,8 +7,11 @@ StartLimitIntervalSec=0
 Type=simple
 Restart=always
 RestartSec=1
-User=e33b1711
-ExecStart=/home/e33b1711/power_raspi/mqtt_relay.py
+User=ak
+WorkingDirectory=/home/ak/power_raspi
+Environment=PYTHONPATH=/home/ak/power_raspi
+ExecStart=/home/ak/power_raspi/venv/bin/python mqtt_relay.py
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

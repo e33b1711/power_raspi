@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Controls PV charger and electric heater, interfaces to openhab via mqtt"""
 import time
 import signal
