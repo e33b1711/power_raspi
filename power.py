@@ -225,7 +225,7 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
     mqtt_init(COMMAND_TOPICS, [callback_set_flag, callback_set_flag, call_back_set_charger,
-                call_back_switch_charger], broker = "whiplash.fritz.box")
+                call_back_switch_charger], broker = "127.0.0.1")
     init_charger()
 
     logger.info("Init done.")

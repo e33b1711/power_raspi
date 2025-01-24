@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
-BROKER = "localhost"
+BROKER = "127.0.0.1"
 STATE_PREFIX = "power_state/"
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 COMMAND_TOPIC_PREFIX = "power_command/"
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     'charger_power':            -99}
 
     print(all_data)
-    mqtt_init(COMMAND_TOPICS, [callback0, callback1, callback2, callback3], broker = "whiplash.fritz.box")
+    mqtt_init(COMMAND_TOPICS, [callback0, callback1, callback2, callback3], broker = BROKER)
     mqtt_publish(all_data)
 
     time.sleep(60)

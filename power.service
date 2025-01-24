@@ -1,5 +1,5 @@
 [Unit]
-Description=tcp echo to mqtt relay
+Description=power automations
 After=network.target
 StartLimitIntervalSec=0
 

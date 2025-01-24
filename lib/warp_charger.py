@@ -127,7 +127,7 @@ def update_charger(power):
 
 
 if __name__ == "__main__":
-    logger.basicConfig(level=0)
+    logging.basicConfig(level=0)
 
     print("====Init charger=====")
     init_charger()
