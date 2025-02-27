@@ -44,7 +44,7 @@ def handle_client(client_socket):
         send_mqtt(messages)
 
         # only relay commands via tcp
-        if not message.count('!c!') > 0:
+        if message.count('!c!') > 0:
             broadcast(data, client_socket)
 
 
