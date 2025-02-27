@@ -1,0 +1,5 @@
+better kill the relay (signal)
+
+heat => go over mqtt
+
+get ip automatically

@@ -1,0 +1,51 @@
+1) plain vanilla openhabian
+
+
+2) change host name eventually
+
+
+3) install serial binding / astro binding / ntp / Fritzbox TR064 Binding / cloud connector / RRD4j Persistence  / mqtt binding
+
+
+4) tcp_relay as a service:
+	tcp_relay.service to /etc/systemd/system/
+    
+    
+5) socat serial bridge as a service:
+	socat@.service to /etc/systemd/systm/  (is the service, needs config file)
+	socat-ttyNET0.conf to /etc/default    (is the config file for the service)
+    
+    
+6)  enable / start services
+    sudo systemctl start tcp_relay
+    sudo systemctl enable tcp_relay
+    sudo systemctl start socat@.service
+    sudo systemctl enable socat@.service
+    
+    
+6) clone openhab config rep (purge dir before)
+
+
+7) make serial bridge avaible in openhab:
+	sudo nano /etc/default/openhab2
+	Adjust the EXTRA_JAVA_OPTS accordingly
+	EXTRA_JAVA_OPTS="-Dgnu.io.rxtx.SerialPorts=/dev/ttyUSB0:/dev/ttyS0:/dev/ttyS2:/dev/ttyACM0:/dev/ttyAMA0:/dev/ttyNET0"
+    
+    
+8) install mosqito with:
+    sudo openhabian-config (optional componenets => 20 mosquitto)
+    
+    
+9) my openhab secret / UUID
+    nano /var/lib/openhab2/openhabcloud/secret  
+    nano /var/lib/openhab2/uuid  
+    => auf myopenhab aktualisieren
+    
+    
+10) sd card backup:
+    => automount external drive (ext4)
+    => make dir with permission for user backup
+    => openhabian-config => 50 BACKUP => setup amanda (email does not matter!)
+(https://community.openhab.org/t/install-configure-and-test-amanda-on-openhabian-for-beginners/104853)
+    
+    
