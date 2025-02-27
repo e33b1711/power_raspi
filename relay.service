@@ -1,0 +1,17 @@
+[Unit]
+Description=tcp echo to mqtt relay
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=ak
+WorkingDirectory=/home/ak/power_raspi
+Environment=PYTHONPATH=/home/ak/power_raspi
+ExecStart=/home/ak/power_raspi/venv/bin/python relay_server.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
