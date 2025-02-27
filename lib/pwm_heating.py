@@ -9,7 +9,7 @@ logger.setLevel(logging.ERROR)
 MAX_SETPOINT = 220
 MIN_SETPOINT = 10
 POWER_2_PWM = 220/3000
-HOST = "192.168.178.23"
+HOST = "192.168.178.91"
 PORT = 8888
 
 def set_heat(setpoint):
