@@ -10,7 +10,7 @@ RestartSec=1
 User=ak
 WorkingDirectory=/home/ak/power_raspi/relay
 Environment=PYTHONPATH=/home/ak/power_raspi
-ExecStart=/home/ak/power_raspi/venv/bin/python relay_server.py 192.168.178.91 8888
+ExecStart=/home/ak/power_raspi/venv/bin/python relay_server.py
 Restart=on-failure
 
 [Install]

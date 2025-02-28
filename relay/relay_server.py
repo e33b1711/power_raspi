@@ -10,8 +10,8 @@ import paho.mqtt.client as mqtt
 
 
 # tcp stuff
-list_of_clients: list = []
-list_master_clients: list = []
+client_socks: list = []
+client_threads: list = []
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # logging stuff
@@ -27,31 +27,56 @@ RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
 MAX_RECONNECT_DELAY = 60
 
+# for ending threads
+end_threads = False
+
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.254.254.254', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 
 def handle_client(client_socket):
     """Client thread function"""
 
-    while True:
-        data = client_socket.recv(1024)
-        if not data:
-            break
+    while not end_threads:
+        try:
+            data = client_socket.recv(1024)
+        except socket.timeout:
+            pass
+        except:
+            raise
+        else:
+            if not data:
+                break
 
-        message = data.decode('utf-8')
-        logger.debug("Received message: %s", message)
+            message = data.decode('utf-8')
+            logger.debug("Received message: %s", message)
 
-        # send via mqtt
-        messages = get_message(message)
-        send_mqtt(messages)
+            # send via mqtt
+            messages = get_message(message)
+            send_mqtt(messages)
 
-        # only relay commands via tcp
-        if message.count('!c!') > 0:
-            broadcast(data, client_socket)
+            # only relay commands via tcp
+            if message.count('!c!') > 0:
+                broadcast(data, client_socket)
+
+    logger.info("Closing client thread.")
 
 
 def broadcast(message, connection=None):
     """Relay message to all clients"""
 
-    for clients in list_of_clients:
+    for clients in client_socks:
         if clients != connection:
             try:
                 clients.send(message)
@@ -102,12 +127,13 @@ def publish_mqtt(key, payload):
 def remove(connection):
     """Remove client from list"""
 
-    if connection in list_of_clients:
-        list_of_clients.remove(connection)
+    if connection in client_socks:
+        client_socks.remove(connection)
 
 
 def init_socket(ip_address, port):
     """Open the socket"""
+    server_socket.settimeout(0.2)
     server_socket.bind((ip_address, port))
     server_socket.listen(5)
     logger.info("Server listening on %s , %i", str(ip_address), port)
@@ -147,47 +173,58 @@ def on_disconnect(client, userdata, rc):
 
 def init_mqtt():
     """Initialize MQTT"""
+    #TODO try kill on except
+    return
     client.on_message = on_message
     client.on_disconnect = on_disconnect
     client.connect(BROKER_ADDRESS)
     client.loop_start()
     client.subscribe([("ard_state/#", 1), ("ard_command/#", 1)])
 
+
 def signal_handler(sig, frame):
     """Clean up on exit"""
-    server_socket.close()
+    logger.info('Closing down.')
+    global end_threads
+    end_threads = True
 
-    for sock in list_of_clients:
-        sock.close()
-
-    logger.info('Exit...')
-    sys.exit(0)
 
 
 def main():
     """Main function"""
 
-    if len(sys.argv) != 3:
-        print("Correct usage: script, IP address, port number")
-        sys.exit()
-    ip_address = str(sys.argv[1])
-    port = int(sys.argv[2])
+    ip_address = get_ip()
+    port = 8888
     init_socket(ip_address, port)
     init_mqtt()
     signal.signal(signal.SIGINT, signal_handler)
 
-    while True:
-        client_socket, client_address = server_socket.accept()
-        list_of_clients.append(client_socket)
-        print(f"Accepted connection from {client_address}")
-        client_handler = threading.Thread(
-            target=handle_client, args=(client_socket,))
-        client_handler.start()
+    while not end_threads:
+        try:
+            client_socket, client_address = server_socket.accept()
+            client_socket.settimeout(0.2)
+        except socket.timeout:
+            pass
+        except:
+            raise
+        else:
+            logger.info("Accepted connection from {client_address}")
+            client_handler = threading.Thread(
+                target=handle_client, args=(client_socket,))
+            client_handler.start()
+            client_socks.append(client_socket)
+            client_threads.append(client_handler)
 
-    # TODO sigint handler
+    logger.info('Closing sockets...')
+    server_socket.close()
+    for sock in client_socks:
+        sock.close()
+    logger.info('Closing sockets done.')
 
-    conn.close()
-    server.close()
+    logger.info('waiting for threads to close')
+    for thread in client_threads:
+        thread.join()
+    logger.info('All threads closed. Good bye!')
 
 
 if __name__ == "__main__":
