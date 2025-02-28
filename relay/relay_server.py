@@ -214,6 +214,11 @@ def main():
             client_handler.start()
             client_socks.append(client_socket)
             client_threads.append(client_handler)
+    
+    logger.info('waiting for threads to close')
+    for thread in client_threads:
+        thread.join()
+    logger.info('All threads closed. Good bye!')
 
     logger.info('Closing sockets...')
     server_socket.close()
@@ -221,10 +226,7 @@ def main():
         sock.close()
     logger.info('Closing sockets done.')
 
-    logger.info('waiting for threads to close')
-    for thread in client_threads:
-        thread.join()
-    logger.info('All threads closed. Good bye!')
+    
 
 
 if __name__ == "__main__":
