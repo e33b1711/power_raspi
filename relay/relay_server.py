@@ -13,6 +13,7 @@ import paho.mqtt.client as mqtt
 client_socks: list = []
 client_threads: list = []
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+end_threads = False
 
 # logging stuff
 logging.basicConfig(level=logging.INFO)
@@ -27,11 +28,9 @@ RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
 MAX_RECONNECT_DELAY = 60
 
-# for ending threads
-end_threads = False
-
 
 def get_ip():
+    """Get primary IP adddress of this host"""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0)
     try:
@@ -76,13 +75,13 @@ def handle_client(client_socket):
 def broadcast(message, connection=None):
     """Relay message to all clients"""
 
-    for clients in client_socks:
-        if clients != connection:
+    for client in client_socks:
+        if client != connection:
             try:
-                clients.send(message)
+                client.send(message)
             except:
-                clients.close()
-                remove(clients)
+                client.close()
+                remove(client)
 
 
 def get_message(mess_buff):
@@ -124,11 +123,11 @@ def publish_mqtt(key, payload):
     client.publish(STATE_PREFIX + key, payload)
 
 
-def remove(connection):
+def remove(client):
     """Remove client from list"""
 
-    if connection in client_socks:
-        client_socks.remove(connection)
+    if client in client_socks:
+        client_socks.remove(client)
 
 
 def init_socket(ip_address, port):
@@ -152,7 +151,7 @@ def on_message(client, userdata, message):
 
 
 def on_disconnect(client, userdata, rc):
-    """MQTT recoverer."""
+    """Try to recover MQTT"""
     logger.error("Disconnected with result code: %s", rc)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
@@ -175,10 +174,12 @@ def on_disconnect(client, userdata, rc):
 def init_mqtt():
     """Initialize MQTT"""
     #TODO try kill on except
-    return
     client.on_message = on_message
     client.on_disconnect = on_disconnect
-    client.connect(BROKER_ADDRESS)
+    try:
+        client.connect(BROKER_ADDRESS)
+    except:
+        logger.error("Could not connect to mqtt server.")
     client.loop_start()
     client.subscribe([("ard_state/#", 1), ("ard_command/#", 1)])
 
@@ -190,31 +191,8 @@ def signal_handler(sig, frame):
     end_threads = True
 
 
-
-def main():
-    """Main function"""
-
-    ip_address = get_ip()
-    port = 8888
-    init_socket(ip_address, port)
-    init_mqtt()
-    signal.signal(signal.SIGINT, signal_handler)
-
-    while not end_threads:
-        try:
-            client_socket, client_address = server_socket.accept()
-            client_socket.settimeout(0.2)
-        except socket.timeout:
-            pass
-        except:
-            raise
-        else:
-            logger.info("Accepted connection from {client_address}")
-            client_handler = threading.Thread(
-                target=handle_client, args=(client_socket,))
-            client_handler.start()
-            client_socks.append(client_socket)
-            client_threads.append(client_handler)
+def shut_down():
+    """End Threads. Close sockets."""
     
     logger.info('waiting for threads to close')
     for thread in client_threads:
@@ -226,6 +204,36 @@ def main():
     for sock in client_socks:
         sock.close()
     logger.info('Closing sockets done.')
+
+    
+def main_loop():
+    """Accept incomming connections. Start threads to handel them."""
+
+    while not end_threads:
+        try:
+            client_socket, client_address = server_socket.accept()
+            client_socket.settimeout(0.2)
+        except socket.timeout:
+            pass
+        except:
+            raise
+        else:
+            logger.info("Accepted connection from " + str(client_address)), 
+            client_handler = threading.Thread(
+                target=handle_client, args=(client_socket,))
+            client_handler.start()
+            client_socks.append(client_socket)
+            client_threads.append(client_handler)
+
+
+def main():
+    """Main function"""
+
+    init_socket(get_ip(), 8888)
+    init_mqtt()
+    signal.signal(signal.SIGINT, signal_handler)
+    main_loop()
+    shut_down()
 
     
 
