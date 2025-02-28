@@ -15,7 +15,7 @@ client_threads: list = []
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # logging stuff
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # MQTT stuff
@@ -133,6 +133,7 @@ def remove(connection):
 
 def init_socket(ip_address, port):
     """Open the socket"""
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.settimeout(0.2)
     server_socket.bind((ip_address, port))
     server_socket.listen(5)
