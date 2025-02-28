@@ -16,7 +16,7 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 end_threads = False
 
 # logging stuff
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # MQTT stuff
@@ -66,7 +66,9 @@ def handle_client(client_socket):
             send_mqtt(messages)
 
             # dont relay state messages
+            logger.debug("message count: " + str(message.count('!s!')))
             if message.count('!s!') == 0:
+                logger.debug("tcp brodcasting: " + message)
                 broadcast(data, client_socket)
 
     logger.info("Closing client thread.")
