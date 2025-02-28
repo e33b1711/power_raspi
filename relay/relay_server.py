@@ -65,8 +65,8 @@ def handle_client(client_socket):
             messages = get_message(message)
             send_mqtt(messages)
 
-            # only relay commands via tcp
-            if message.count('!c!') > 0:
+            # dont relay state messages
+            if message.count('!s!') == 0:
                 broadcast(data, client_socket)
 
     logger.info("Closing client thread.")
