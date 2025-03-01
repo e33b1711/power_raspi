@@ -16,7 +16,7 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 end_threads = False
 
 # logging stuff
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # MQTT stuff
@@ -44,6 +44,19 @@ def get_ip():
     return IP
 
 
+def filter_types(messages):
+    """Filter out state messages."""
+    messages_out = ""
+    for message in messages:
+        if not "!s!" in message:
+            messages_out += message + "\n"
+            logger.debug("Going through: " + message)
+        else:
+            logger.debug("Filtered out: " + message)
+    
+    return messages_out.encode()
+
+
 def handle_client(client_socket):
     """Client thread function"""
 
@@ -65,14 +78,16 @@ def handle_client(client_socket):
             messages = get_message(message)
             send_mqtt(messages)
 
-            broadcast(data, client_socket)
+            # relay to the others
+            broadcast(filter_types(messages), client_socket)
 
     logger.info("Closing client thread.")
 
 
 def broadcast(message, connection=None):
     """Relay message to all clients"""
-
+    if message=="":
+        return
     for client in client_socks:
         if client != connection:
             try:
