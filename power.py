@@ -9,8 +9,8 @@ import math
 from lib.victron import read_victron, MAX_BATT_IN_POWER
 from lib.warp_charger import charger_on, charger_off, read_charger
 from lib.warp_charger import update_charger, init_charger, set_charger
-from lib.mqtt import mqtt_publish, mqtt_init, COMMAND_TOPICS, mqtt_stop
-from lib.pwm_heating import set_heat, POWER_2_PWM, MAX_SETPOINT, MIN_SETPOINT
+from lib.mqtt import mqtt_publish, mqtt_init, COMMAND_TOPICS, mqtt_stop, mqtt_publish_ard_command
+from lib.pwm_heating import get_heat_data, POWER_2_PWM, MAX_SETPOINT, MIN_SETPOINT
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -21,24 +21,24 @@ OFF_VALS = ['OFF', '0']
 
 all_data = {
     #collected data
-    'grid_power':               -1,           
-    'solar_power':              -1,           
-    'battery_power':            -1,         
-    'loads_power':              -1,           
+    'grid_power':               -1,
+    'solar_power':              -1,
+    'battery_power':            -1,
+    'loads_power':              -1,
     'criticial_loads_power':    -1,
     'ess_setpoint':             0,
-    'victron_status':           -1,        
+    'victron_status':           -1,
     'state_of_charge':          -1,
-    'charger_power':            -1,        
+    'charger_power':            -1,
     'charger_setpoint':         -1,
     'charger_status':           -1,
     'heat_connected':           -1,
     #own data
     'heat_conneted':            0,
-    'victron_connected':        0,   
+    'victron_connected':        0,
     'charger_connected':        0,
     'delta_power':              None,
-    'heat_setpoint':            0,             
+    'heat_setpoint':            0,
     'solar_power_mean':         None,
     'solar2heat':               "OFF",
     'solar2car':                "OFF",
@@ -114,7 +114,7 @@ def calc_aux_power():
         batt_in_power =  MAX_BATT_IN_POWER
     all_data['delta_power'] = -1*all_data['grid_power'] - batt_in_power + all_data['battery_power']
 
-    #calculate mean solar power       
+    #calculate mean solar power
     if all_data['solar_power_mean']:
         all_data['solar_power_mean'] += 0.01*(all_data['solar_power']-all_data['solar_power_mean'])
     else:
@@ -171,14 +171,9 @@ def heat_control():
 
         logger.info("New heat setpoint: %s", str(all_data['heat_setpoint']))
 
-        #write 0 only once
-        if not(last_sp == 0 and all_data['heat_setpoint']==0):
-            if set_heat(all_data['heat_setpoint']):
-                all_data['heat_conneted'] = 1
-            else:
-                all_data['heat_conneted'] = 0
-
-    #heat off by timeout in heat controller
+        # write 0 only once
+        if not (last_sp == 0 and all_data['heat_setpoint'] == 0):
+            mqtt_publish_ard_command(get_heat_data(all_data['heat_setpoint']))
 
 
 def get_victron():
@@ -213,7 +208,7 @@ def kill_some_time():
         #init
         all_data['last_update'] = time.time()
     else:
-        #wait 
+        #wait
         while time.time() < all_data['last_update']  + INTERVAL:
             time.sleep(0.1)
         all_data['last_update'] += 5
@@ -239,7 +234,7 @@ def main():
         charger_control()
         heat_control()
         mqtt_publish(all_data)
- 
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

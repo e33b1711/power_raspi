@@ -8,6 +8,7 @@ logger.setLevel(logging.ERROR)
 
 BROKER = "127.0.0.1"
 STATE_PREFIX = "power_state/"
+ARD_COMMAND_PREFIX = "ard_command/"
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 COMMAND_TOPIC_PREFIX = "power_command/"
 COMMAND_TOPICS = [COMMAND_TOPIC_PREFIX + "solar2heat",
@@ -104,6 +105,13 @@ def mqtt_publish(data):
     for key, value in data.items():
         client.publish(STATE_PREFIX + key, value)
         logger.debug("publish: %s%s / %s", STATE_PREFIX, key, str(value))
+    logger.info('mqtt_publish done.')
+
+def mqtt_publish_ard_command(data):
+    """Publish a dict on mqtt"""
+    for key, value in data.items():
+        client.publish(ARD_COMMAND_PREFIX + key, value)
+        logger.debug("publish: %s%s / %s", ARD_COMMAND_PREFIX, key, str(value))
     logger.info('mqtt_publish done.')
 
 
