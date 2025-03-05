@@ -1,1 +1,2 @@
-heat => go over mqtt
+( ) power: heat => go over mqtt
+( ) relay: commands are echoed back to the arduino nodes (especially bad with toggle)
