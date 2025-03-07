@@ -1,2 +1,3 @@
-(x) power: heat => go over mqtt
 ( ) start / restart behavior (no ip / no mqtt / relay + power server)
+(x) power: heat => go over mqtt
+( ) relay: commands are echoed back to the arduino nodes (especially bad with toggle)
