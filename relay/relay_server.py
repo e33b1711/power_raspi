@@ -16,7 +16,7 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 end_threads = False
 
 # logging stuff
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # MQTT stuff
@@ -33,14 +33,21 @@ def get_ip():
     """Get primary IP adddress of this host"""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.254.254.254', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
+    IP = '127.0.0.1'
+    while IP == '127.0.0.1':
+        try:
+            # doesn't even have to be reachable
+            s.connect(('10.254.254.254', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        if IP == '127.0.0.1':
+            logger.warning("Got no IP but loopback.")
+            time.sleep(3)
+        else:
+            logger.info("Got IP: " + IP)
     return IP
 
 
@@ -163,9 +170,9 @@ def on_message(client, userdata, message):
         broadcast(echo_message.encode())
 
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, flags, reason_code, properties):
     """Try to recover MQTT"""
-    logger.error("Disconnected with result code: %s", rc)
+    logger.error("Disconnected with result code: %s", reason_code)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logger.info("Reconnecting in %d seconds...", reconnect_delay)
@@ -184,17 +191,25 @@ def on_disconnect(client, userdata, rc):
     logger.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
 
 
-def init_mqtt():
+def mqtt_thread():
     """Initialize MQTT"""
     #TODO try kill on except
+    logger.info("Mqtt thread...")
     client.on_message = on_message
     client.on_disconnect = on_disconnect
-    try:
-        client.connect(BROKER_ADDRESS)
-    except:
-        logger.error("Could not connect to mqtt server.")
+   
+    while not end_threads:
+        try:
+            client.connect(BROKER_ADDRESS)
+        except:
+            logger.error("Could not connect to mqtt server. Trying again in 3 sec.")
+            time.sleep(3)
+        finally:
+            logger.info("Connected to mqtt server.")
+            break
     client.loop_start()
     client.subscribe([("ard_state/#", 1), ("ard_command/#", 1)])
+    logger.info("Mqtt thread done.")
 
 
 def signal_handler(sig, frame):
@@ -243,10 +258,11 @@ def main():
     """Main function"""
 
     init_socket(get_ip(), 8888)
-    init_mqtt()
+    m_thread = threading.Thread(target = mqtt_thread, args=None)
     signal.signal(signal.SIGINT, signal_handler)
     main_loop()
     shut_down()
+    m_thread.join()
 
     
 
