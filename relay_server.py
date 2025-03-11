@@ -5,54 +5,36 @@ import argparse
 import logging
 import signal
 import re
-import time
-import paho.mqtt.client as mqtt
+from lib.mqtt import mqtt_publish, mqtt_init, mqtt_stop
+from lib.get_ip import get_ip
 
+
+# global stuff
+end_threads = False
 
 # tcp stuff
 client_socks: list = []
 client_threads: list = []
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-end_threads = False
 
 # logging stuff
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # MQTT stuff
-BROKER_ADDRESS = "ironmaiden"
-STATE_PREFIX = "ard_state/"
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-FIRST_RECONNECT_DELAY = 1
-RECONNECT_RATE = 2
-MAX_RECONNECT_COUNT = 12
-MAX_RECONNECT_DELAY = 60
-
-
-def get_ip():
-    """Get primary IP adddress of this host"""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(0)
-    try:
-        # doesn't even have to be reachable
-        s.connect(('10.254.254.254', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
+BROKER = "ironmaiden"
+TOPICS = ["ard_command/#"]
 
 
 def filter_types(messages):
     """Filter out state messages."""
     messages_out = ""
     for message in messages:
-        if not "!s!" in message:
+        if "!s!" not in message:
             messages_out += message + "\n"
-            logger.debug("Going through: " + message)
+            logger.debug("Going through: %s", message)
         else:
-            logger.debug("Filtered out: " + message)
+            logger.debug("Filtered out: %s", message)
 
     return messages_out.encode()
 
@@ -65,8 +47,6 @@ def handle_client(client_socket):
             data = client_socket.recv(1024)
         except socket.timeout:
             pass
-        except:
-            raise
         else:
             if not data:
                 break
@@ -86,25 +66,25 @@ def handle_client(client_socket):
 
 def broadcast(message, connection=None):
     """Relay message to all clients"""
-    if message=="":
+    if message == "":
         return
     for client in client_socks:
         if client != connection:
             try:
                 client.send(message)
-            except:
+            except Exception as e:
+                logger.error("Caught Exception: %s", str(e))
                 client.close()
                 remove(client)
 
 
 def get_message(mess_buff):
     """get complete message from echo."""
-
     messages = []
     while "$" in mess_buff:
         message, mess_buff = re.split("\n|$", mess_buff, maxsplit=1)
         message = message.strip()
-        logger.debug("stripped message: %s",message)
+        logger.debug("stripped message: %s", message)
         if message != "":
             messages.append(message)
     logger.debug("returning messages: %s", str(messages))
@@ -125,20 +105,13 @@ def send_mqtt(messages):
         _, message_type, topic, payload = message.replace('$', '').split("!")
 
         if message_type == "s":
-            publish_mqtt(topic, payload)
+            mqtt_publish({topic: payload})
         else:
             logger.debug("Message not type s: %s", message)
 
 
-def publish_mqtt(key, payload):
-    """Publish on MQTT."""
-    logger.info("Outgoing on MQTT: %s %s", STATE_PREFIX + key, payload)
-    client.publish(STATE_PREFIX + key, payload)
-
-
 def remove(client):
     """Remove client from list"""
-
     if client in client_socks:
         client_socks.remove(client)
 
@@ -161,40 +134,6 @@ def on_message(client, userdata, message):
         echo_message = f"!c!{topic[1]}!{payload}$\n"
         logger.info("Outgoing on ECHO: %s", echo_message.strip())
         broadcast(echo_message.encode())
-
-
-def on_disconnect(client, userdata, rc):
-    """Try to recover MQTT"""
-    logger.error("Disconnected with result code: %s", rc)
-    reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
-    while reconnect_count < MAX_RECONNECT_COUNT:
-        logger.info("Reconnecting in %d seconds...", reconnect_delay)
-        time.sleep(reconnect_delay)
-
-        try:
-            client.reconnect()
-            logging.info("Reconnected successfully!")
-            return
-        except Exception as err:
-            logger.error("%s. Reconnect failed. Retrying...", err)
-
-        reconnect_delay *= RECONNECT_RATE
-        reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
-        reconnect_count += 1
-    logger.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
-
-
-def init_mqtt():
-    """Initialize MQTT"""
-    #TODO try kill on except
-    client.on_message = on_message
-    client.on_disconnect = on_disconnect
-    try:
-        client.connect(BROKER_ADDRESS)
-    except:
-        logger.error("Could not connect to mqtt server.")
-    client.loop_start()
-    client.subscribe([("ard_state/#", 1), ("ard_command/#", 1)])
 
 
 def signal_handler(sig, frame):
@@ -228,8 +167,6 @@ def main_loop():
             client_socket.settimeout(0.2)
         except socket.timeout:
             pass
-        except:
-            raise
         else:
             logger.info("Accepted connection from " + str(client_address)),
             client_handler = threading.Thread(
@@ -239,24 +176,29 @@ def main_loop():
             client_threads.append(client_handler)
 
 
-def main():
+def main(broker):
     """Main function"""
 
-    init_socket(get_ip(), 8888)
-    init_mqtt()
+    primary_ip = get_ip(exit_on_fail=True)
+    mqtt_init(TOPICS, [on_message], broker=broker)
+
+    init_socket(primary_ip, 8888)
     signal.signal(signal.SIGINT, signal_handler)
     main_loop()
+    mqtt_stop()
     shut_down()
-
-
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument( '-log',
-                     '--loglevel',
-                     default='warning',
-                     help='Provide logging level. Example --loglevel debug, default=warning' )
+    parser.add_argument('-log',
+                        '--loglevel',
+                        default='warning',
+                        help='Provide logging level. Example --loglevel debug, default=warning')
+    parser.add_argument('-b',
+                        '--broker',
+                        default=BROKER,
+                        help='MQTT Broker')
     args = parser.parse_args()
-    logger.setLevel(level=args.loglevel.upper() )
-    main()
+    logger.setLevel(level=args.loglevel.upper())
+    main(args.broker)

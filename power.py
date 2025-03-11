@@ -20,20 +20,20 @@ ON_VALS = ['ON', '1']
 OFF_VALS = ['OFF', '0']
 
 all_data = {
-    #collected data
-    'grid_power':               -1,
-    'solar_power':              -1,
-    'battery_power':            -1,
-    'loads_power':              -1,
-    'criticial_loads_power':    -1,
+    # collected data
+    'grid_power': -1,
+    'solar_power': -1,
+    'battery_power': -1,
+    'loads_power': -1,
+    'criticial_loads_power': -1,
     'ess_setpoint':             0,
-    'victron_status':           -1,
-    'state_of_charge':          -1,
-    'charger_power':            -1,
-    'charger_setpoint':         -1,
-    'charger_status':           -1,
-    'heat_connected':           -1,
-    #own data
+    'victron_status': -1,
+    'state_of_charge': -1,
+    'charger_power': -1,
+    'charger_setpoint': -1,
+    'charger_status': -1,
+    'heat_connected': -1,
+    # own data
     'heat_conneted':            0,
     'victron_connected':        0,
     'charger_connected':        0,
@@ -51,19 +51,19 @@ all_data = {
 def signal_handler(sig, frame):
     """Handle exit gracefully"""
 
-    #disconnected / turned off
+    # disconnected / turned off
     data = {}
-    data['solar2heat']  = 0
-    data['solar2car']   = 0
-    data['charger_connected']  = 0
-    data['victron_connected']  = 0
-    data['heat_connected']  = 0
+    data['solar2heat'] = 0
+    data['solar2car'] = 0
+    data['charger_connected'] = 0
+    data['victron_connected'] = 0
+    data['heat_connected'] = 0
 
-    #turn off charger
+    # turn off charger
     charger_off()
     mqtt_publish(get_charger())
 
-    #publish mqtt control states
+    # publish mqtt control states
     mqtt_publish(data)
     mqtt_stop()
 
@@ -88,7 +88,8 @@ def call_back_set_charger(client, userdata, message):
         set_charger(round(payload_val))
         mqtt_publish(get_charger())
     else:
-        logger.info("mqtt calback set charger: %s [blocked by solar2car]", str(payload_val))
+        logger.info(
+            "mqtt calback set charger: %s [blocked by solar2car]", str(payload_val))
 
 
 def call_back_switch_charger(client, userdata, message):
@@ -102,43 +103,47 @@ def call_back_switch_charger(client, userdata, message):
             charger_on()
         mqtt_publish(get_charger())
     else:
-        logger.info("mqtt calback switch charger: %s [blocked by solar2car]" , str(payload_val))
+        logger.info(
+            "mqtt calback switch charger: %s [blocked by solar2car]", str(payload_val))
 
 
 def calc_aux_power():
     """Calc some auxilary power values"""
-     #calculate delta power (give battery in power priority)
-    if all_data['state_of_charge']>90:
-        batt_in_power =  MAX_BATT_IN_POWER/10*(100-int(all_data['state_of_charge']))
+    # calculate delta power (give battery in power priority)
+    if all_data['state_of_charge'] > 90:
+        batt_in_power = MAX_BATT_IN_POWER/10 * \
+            (100-int(all_data['state_of_charge']))
     else:
-        batt_in_power =  MAX_BATT_IN_POWER
-    all_data['delta_power'] = -1*all_data['grid_power'] - batt_in_power + all_data['battery_power']
+        batt_in_power = MAX_BATT_IN_POWER
+    all_data['delta_power'] = -1*all_data['grid_power'] - \
+        batt_in_power + all_data['battery_power']
 
-    #calculate mean solar power
+    # calculate mean solar power
     if all_data['solar_power_mean']:
-        all_data['solar_power_mean'] += 0.01*(all_data['solar_power']-all_data['solar_power_mean'])
+        all_data['solar_power_mean'] += 0.01 * \
+            (all_data['solar_power']-all_data['solar_power_mean'])
     else:
         all_data['solar_power_mean'] = all_data['solar_power']
     # set to 0 eventually
-    if all_data['solar_power_mean']<10 and all_data['solar_power']==0:
+    if all_data['solar_power_mean'] < 10 and all_data['solar_power'] == 0:
         all_data['solar_power_mean'] = 0.0
 
 
 def charger_control():
     """Charger control algorithm"""
-    #translate status to flags
+    # translate status to flags
     match all_data['charger_status']:
         case 1 | 2:
-            all_data['car_connected']=1
-            all_data['charging']="OFF"
+            all_data['car_connected'] = 1
+            all_data['charging'] = "OFF"
         case 3:
-            all_data['car_connected']=1
-            all_data['charging']="ON"
+            all_data['car_connected'] = 1
+            all_data['charging'] = "ON"
         case _:
-            all_data['car_connected']=0
-            all_data['charging']="OFF"
+            all_data['car_connected'] = 0
+            all_data['charging'] = "OFF"
 
-    #pv power controll
+    # pv power controll
     if all_data['solar2car'] in ON_VALS:
         charger_update = all_data['solar_power_mean']*0.9
         update_charger(charger_update)
@@ -158,16 +163,18 @@ def heat_control():
         last_sp = all_data['heat_setpoint']
         increment = math.ceil(all_data['delta_power'] * POWER_2_PWM * 0.5)
 
-        #start late at 30
+        # start late at 30
         if all_data['heat_setpoint'] == 0:
             all_data['heat_setpoint'] = increment
         else:
             all_data['heat_setpoint'] += increment
 
-        #limit
-        all_data['heat_setpoint'] = min(all_data['heat_setpoint'], MAX_SETPOINT)
-        #cut off
-        all_data['heat_setpoint'] = cut_off(all_data['heat_setpoint'], MIN_SETPOINT)
+        # limit
+        all_data['heat_setpoint'] = min(
+            all_data['heat_setpoint'], MAX_SETPOINT)
+        # cut off
+        all_data['heat_setpoint'] = cut_off(
+            all_data['heat_setpoint'], MIN_SETPOINT)
 
         logger.info("New heat setpoint: %s", str(all_data['heat_setpoint']))
 
@@ -185,6 +192,7 @@ def get_victron():
     all_data['victron_connected'] = 1
     for key, val in result.items():
         all_data[key] = val
+
 
 def get_charger():
     """read charger =>  update all data"""
@@ -205,11 +213,11 @@ def get_charger():
 def kill_some_time():
     """Call me to kill the reamining interval."""
     if not all_data['last_update']:
-        #init
+        # init
         all_data['last_update'] = time.time()
     else:
-        #wait
-        while time.time() < all_data['last_update']  + INTERVAL:
+        # wait
+        while time.time() < all_data['last_update'] + INTERVAL:
             time.sleep(0.1)
         all_data['last_update'] += 5
     logger.debug("End of loop. %s", str(all_data['last_update']))
@@ -220,7 +228,7 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
     mqtt_init(COMMAND_TOPICS, [callback_set_flag, callback_set_flag, call_back_set_charger,
-                call_back_switch_charger], broker = "127.0.0.1")
+                               call_back_switch_charger], broker="127.0.0.1")
     init_charger()
 
     logger.info("Init done.")
@@ -238,10 +246,10 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument( '-log',
-                     '--loglevel',
-                     default='warning',
-                     help='Provide logging level. Example --loglevel debug, default=warning' )
+    parser.add_argument('-log',
+                        '--loglevel',
+                        default='warning',
+                        help='Provide logging level. Example --loglevel debug, default=warning')
     args = parser.parse_args()
-    logger.setLevel(level=args.loglevel.upper() )
+    logger.setLevel(level=args.loglevel.upper())
     main()

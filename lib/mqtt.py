@@ -1,7 +1,9 @@
 """mqtt to openhab interface"""
 import logging
 import time
+import sys
 import paho.mqtt.client as mqtt
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -85,7 +87,13 @@ def on_disconnect(client, userdata, rc):
 
 def mqtt_init(topics, callbacks, broker=BROKER):
     """Initialize the client"""
-    client.connect(broker)
+    try:
+        client.connect(broker)
+    except Exception as e:
+        logger.error(e)
+        logger.error("Mqtt server unavaible. Good bye.")
+        sys.exit(-1)
+
     client.on_message = callback0
     client.on_disconnect = on_disconnect
     for topic, callback in zip(topics, callbacks):
