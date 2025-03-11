@@ -5,12 +5,15 @@ import argparse
 import logging
 import signal
 import re
+import time
 from lib.mqtt import mqtt_publish, mqtt_init, mqtt_stop
 from lib.get_ip import get_ip
+from lib.git_revision import get_git_rev
 
 
 # global stuff
 end_threads = False
+HEART_RATE = 60*5
 
 # tcp stuff
 client_socks: list = []
@@ -158,17 +161,23 @@ def shut_down():
     logger.info('Closing sockets done.')
 
 
-def main_loop():
+def main_loop(git_rev):
     """Accept incomming connections. Start threads to handel them."""
 
+    last_haert_beat = 0
+
     while not end_threads:
+        if last_haert_beat + HEART_RATE < time.time():
+            mqtt_publish({"releay_service": git_rev})
+            last_haert_beat = time.time()
+
         try:
             client_socket, client_address = server_socket.accept()
             client_socket.settimeout(0.2)
         except socket.timeout:
             pass
         else:
-            logger.info("Accepted connection from " + str(client_address)),
+            logger.info("Accepted connection from %s", str(client_address))
             client_handler = threading.Thread(
                 target=handle_client, args=(client_socket,))
             client_handler.start()
@@ -179,12 +188,14 @@ def main_loop():
 def main(broker):
     """Main function"""
 
+    git_rev = get_git_rev()
     primary_ip = get_ip(exit_on_fail=True)
     mqtt_init(TOPICS, [on_message], broker=broker)
-
     init_socket(primary_ip, 8888)
     signal.signal(signal.SIGINT, signal_handler)
-    main_loop()
+
+    main_loop(git_rev)
+
     mqtt_stop()
     shut_down()
 

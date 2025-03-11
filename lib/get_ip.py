@@ -4,8 +4,8 @@ import sys
 import logging
 
 # logging stuff
-logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+logger.setLevel("INFO")
 
 
 def get_ip(exit_on_fail=True):
