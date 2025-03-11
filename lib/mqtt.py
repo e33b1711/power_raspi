@@ -63,9 +63,9 @@ def callback3(client, userdata, message):
     print(payload)
 
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(arg_client, userdata, flags, reason_code, properties):
     """MQTT recoverer."""
-    logger.info("Disconnected with result code: %s", rc)
+    logger.warning("Disconnected with result code: %s", reason_code)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logging.info("Reconnecting in %d seconds...", reconnect_delay)
