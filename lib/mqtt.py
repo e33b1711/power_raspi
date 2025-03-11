@@ -23,40 +23,40 @@ MAX_RECONNECT_DELAY = 60
 
 def callback0(client, userdata, message):
     """Message callback for testing."""
-    print("message received " ,str(message.payload.decode("utf-8")))
-    print("message topic=",message.topic)
-    print("message qos=",message.qos)
-    print("message retain flag=",message.retain)
+    print("message received ", str(message.payload.decode("utf-8")))
+    print("message topic=", message.topic)
+    print("message qos=", message.qos)
+    print("message retain flag=", message.retain)
     payload = str(message.payload.decode("utf-8"))
     print(payload)
 
 
 def callback1(client, userdata, message):
     """Message callback for testing."""
-    print("message received " ,str(message.payload.decode("utf-8")))
-    print("message topic=",message.topic)
-    print("message qos=",message.qos)
-    print("message retain flag=",message.retain)
+    print("message received ", str(message.payload.decode("utf-8")))
+    print("message topic=", message.topic)
+    print("message qos=", message.qos)
+    print("message retain flag=", message.retain)
     payload = str(message.payload.decode("utf-8"))
     print(payload)
 
 
 def callback2(client, userdata, message):
     """Message callback for testing."""
-    print("message received " ,str(message.payload.decode("utf-8")))
-    print("message topic=",message.topic)
-    print("message qos=",message.qos)
-    print("message retain flag=",message.retain)
+    print("message received ", str(message.payload.decode("utf-8")))
+    print("message topic=", message.topic)
+    print("message qos=", message.qos)
+    print("message retain flag=", message.retain)
     payload = str(message.payload.decode("utf-8"))
     print(payload)
 
 
 def callback3(client, userdata, message):
     """Message callback for testing."""
-    print("message received " ,str(message.payload.decode("utf-8")))
-    print("message topic=",message.topic)
-    print("message qos=",message.qos)
-    print("message retain flag=",message.retain)
+    print("message received ", str(message.payload.decode("utf-8")))
+    print("message topic=", message.topic)
+    print("message qos=", message.qos)
+    print("message retain flag=", message.retain)
     payload = str(message.payload.decode("utf-8"))
     print(payload)
 
@@ -79,10 +79,11 @@ def on_disconnect(client, userdata, rc):
         reconnect_delay *= RECONNECT_RATE
         reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
         reconnect_count += 1
-    logging.info("Reconnect failed after %s attempts. Exiting...", reconnect_count)
+    logging.info("Reconnect failed after %s attempts. Exiting...",
+                 reconnect_count)
 
 
-def mqtt_init(topics, callbacks, broker = BROKER):
+def mqtt_init(topics, callbacks, broker=BROKER):
     """Initialize the client"""
     client.connect(broker)
     client.on_message = callback0
@@ -107,6 +108,7 @@ def mqtt_publish(data):
         logger.debug("publish: %s%s / %s", STATE_PREFIX, key, str(value))
     logger.info('mqtt_publish done.')
 
+
 def mqtt_publish_ard_command(data):
     """Publish a dict on mqtt"""
     for key, value in data.items():
@@ -119,14 +121,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=0)
 
     all_data = {
-    'criticial_loads_power':    -88,
-    'charger_power':            -99}
+        'criticial_loads_power': -88,
+        'charger_power': -99}
 
     print(all_data)
-    mqtt_init(COMMAND_TOPICS, [callback0, callback1, callback2, callback3], broker = BROKER)
+    mqtt_init(COMMAND_TOPICS, [callback0, callback1,
+              callback2, callback3], broker=BROKER)
     mqtt_publish(all_data)
 
     time.sleep(60)
     mqtt_stop()
     print("done.")
-

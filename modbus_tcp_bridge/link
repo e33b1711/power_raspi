@@ -1,7 +1,0 @@
- https://github.com/3cky/mbusd.git
-
- copy conf files to /etc/mbusd/
- 
-sudo systemctl enable mbusd@ttyUSB0.service
-sudo systemctl daemon-reload
-

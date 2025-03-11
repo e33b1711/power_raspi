@@ -1,7 +1,7 @@
 """TCP relay ser"""
 import socket
 import threading
-import sys
+import argparse
 import logging
 import signal
 import re
@@ -53,7 +53,7 @@ def filter_types(messages):
             logger.debug("Going through: " + message)
         else:
             logger.debug("Filtered out: " + message)
-    
+
     return messages_out.encode()
 
 
@@ -206,7 +206,7 @@ def signal_handler(sig, frame):
 
 def shut_down():
     """End Threads. Close sockets."""
-    
+
     logger.info('waiting for threads to close')
     for thread in client_threads:
         thread.join()
@@ -218,7 +218,7 @@ def shut_down():
         sock.close()
     logger.info('Closing sockets done.')
 
-    
+
 def main_loop():
     """Accept incomming connections. Start threads to handel them."""
 
@@ -231,7 +231,7 @@ def main_loop():
         except:
             raise
         else:
-            logger.info("Accepted connection from " + str(client_address)), 
+            logger.info("Accepted connection from " + str(client_address)),
             client_handler = threading.Thread(
                 target=handle_client, args=(client_socket,))
             client_handler.start()
@@ -248,8 +248,15 @@ def main():
     main_loop()
     shut_down()
 
-    
+
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument( '-log',
+                     '--loglevel',
+                     default='warning',
+                     help='Provide logging level. Example --loglevel debug, default=warning' )
+    args = parser.parse_args()
+    logger.setLevel(level=args.loglevel.upper() )
     main()
