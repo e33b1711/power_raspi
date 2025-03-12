@@ -6,7 +6,7 @@ import logging
 import signal
 import re
 import time
-from lib.mqtt import mqtt_publish, mqtt_init, mqtt_stop
+from lib.mqtt import mqtt_publish_ard_state, mqtt_init, mqtt_stop, ARD_STATE_PREFIX
 from lib.get_ip import get_ip
 from lib.git_revision import get_git_rev
 
@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 # MQTT stuff
 BROKER = "ironmaiden"
-STATE_PREFIX = "ard_state/"
 TOPICS = ["ard_command/#"]
 
 
@@ -115,7 +114,7 @@ def send_mqtt(messages):
         _, message_type, topic, payload = message.replace('$', '').split("!")
 
         if message_type == "s":
-            mqtt_publish({topic: payload})
+            mqtt_publish_ard_state({topic: payload})
         else:
             logger.debug("Message not type s: %s", message)
 
@@ -173,7 +172,7 @@ def beat_heart():
     global last_haert_beat
     if last_haert_beat + HEART_RATE < time.time():
         logger.debug("Sending heart beat: %s", git_rev)
-        mqtt_publish({STATE_PREFIX + "relay_service": git_rev})
+        mqtt_publish_ard_state({"relay_service": git_rev})
         last_haert_beat = time.time()
 
 
