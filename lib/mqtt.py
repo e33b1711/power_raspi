@@ -19,7 +19,7 @@ COMMAND_TOPICS = [COMMAND_TOPIC_PREFIX + "solar2heat",
                   COMMAND_TOPIC_PREFIX + "charger_setpoint",
                   COMMAND_TOPIC_PREFIX + "charging"]
 FIRST_RECONNECT_DELAY = 1
-RECONNECT_RATE = 2
+RECONNECT_RATE = 20
 MAX_RECONNECT_COUNT = 12
 MAX_RECONNECT_DELAY = 60
 
@@ -68,7 +68,7 @@ def on_disconnect(arg_client, userdata, flags, reason_code, properties):
     """MQTT recoverer."""
     logger.warning("Disconnected with result code: %s", reason_code)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
-    while reconnect_count < MAX_RECONNECT_COUNT:
+    while True:
         logging.info("Reconnecting in %d seconds...", reconnect_delay)
         time.sleep(reconnect_delay)
 
