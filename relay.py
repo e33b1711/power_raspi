@@ -143,7 +143,8 @@ def beat_heart():
     global last_haert_beat
     if last_haert_beat + HEART_RATE < time.time():
         logger.info("Sending heart beat: %s", git_rev)
-        relay("!s!relay_service!" + git_rev + "$", None, VERBOSE_PORT)
+        message = "!s!relay_service!" + git_rev + "$"
+        relay(message.encode(), None, VERBOSE_PORT)
         last_haert_beat = time.time()
 
 
