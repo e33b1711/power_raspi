@@ -1,3 +1,4 @@
 pymodbus
 requests
 paho-mqtt>=2.0
+gitpython
