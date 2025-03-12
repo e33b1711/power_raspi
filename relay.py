@@ -70,7 +70,14 @@ def relay(message, connection, port):
     if message == "":
         return
     for client in clients:
-        if client != connection and client.getsockname()[1] == port:
+
+        #TOD make me better
+        try:
+            client_port = client.getsockname()[1]
+        except:
+            client_port = 0
+
+        if client != connection and client_port == port:
             logger.debug("Relay: %s", str(client))
             try:
                 client.send(message)
