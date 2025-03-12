@@ -10,7 +10,7 @@ RestartSec=20
 User=ak
 WorkingDirectory=/home/ak/power_raspi/relay
 Environment=PYTHONPATH=/home/ak/power_raspi
-ExecStart=/home/ak/power_raspi/venv/bin/python relay_server.py
+ExecStart=/home/ak/power_raspi/venv/bin/python relay.py
 
 [Install]
 WantedBy=multi-user.target

@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 
 def filter_messages(messages):
     """Filter out state messages."""
+    logger.debug("Filter messages...")
     messages_out = ""
     for message in messages:
-        if "!s!" not in message:
+        if message.startswith("!c!"):
             messages_out += message + "\n"
             logger.debug("Going through: %s", message)
         else:
@@ -56,7 +57,7 @@ def handle_client(client):
             message = data.decode('utf-8')
             logger.debug("Received message: %s", message)
             # relay to the others
-            relay(filter_messages(data), client, PORT)
+            relay(filter_messages(get_message(message)), client, PORT)
             relay(data, client, VERBOSE_PORT)
 
     client.close()
@@ -65,11 +66,12 @@ def handle_client(client):
 
 def relay(message, connection, port):
     """Relay message to all clients"""
+    logger.debug("Relay on port %i", port)
     if message == "":
         return
     for client in clients:
-        logger.debug("Relay: %s", str(client))
-        if client != connection and client.port == port:
+        if client != connection and client.getsockname()[1] == port:
+            logger.debug("Relay: %s", str(client))
             try:
                 client.send(message)
             except Exception as e:
@@ -82,16 +84,8 @@ def relay(message, connection, port):
 
 def get_message(mess_buff):
     """get complete message from echo."""
-    messages = []
-    while "$" in mess_buff:
-        message, mess_buff = re.split("\n|$", mess_buff, maxsplit=1)
-        message = message.strip()
-        logger.debug("stripped message: %s", message)
-        if message != "":
-            messages.append(message)
-    logger.debug("returning messages: %s", str(messages))
-    logger.debug("remaining buff: %s", mess_buff)
-    return messages
+    parts =  re.split(r'\$', mess_buff)
+    return [part.strip() + "$" for part in parts if part.strip()]
 
 
 def remove(client):
@@ -112,7 +106,7 @@ def init(ip_address, port, verbose_port):
     verbose_server.settimeout(0.2)
     verbose_server.bind((ip_address, verbose_port))
     verbose_server.listen(5)
-    logger.info("Server listening on %s , %i", str(ip_address), port)
+    logger.info("Server listening on %s , %i and %i (verbose)", str(ip_address), port, verbose_port)
     return server, verbose_server
 
 
@@ -141,7 +135,7 @@ def beat_heart():
     """Send git rev message all n minutes."""
     global last_haert_beat
     if last_haert_beat + HEART_RATE < time.time():
-        logger.debug("Sending heart beat: %s", git_rev)
+        logger.info("Sending heart beat: %s", git_rev)
         relay("!s!relay_service!" + git_rev + "$", None, VERBOSE_PORT)
         last_haert_beat = time.time()
 
@@ -182,8 +176,8 @@ def main_loop(server, verbose_server):
 def main():
     """Main function"""
 
-    primary_ip = get_ip(exit_on_fail=True)
-    server, verbose_server = init(primary_ip, 8888, 8889)
+    get_ip(exit_on_fail=True)
+    server, verbose_server = init("0.0.0.0", 8888, 8889)
     signal.signal(signal.SIGINT, signal_handler)
 
     main_loop(server, verbose_server)
@@ -194,8 +188,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-log',
                         '--loglevel',
-                        default='warning',
-                        help='Provide logging level. Example --loglevel debug, default=warning')
+                        default='info',
+                        help='Provide logging level. Example --loglevel debug, default=info')
     args = parser.parse_args()
     logger.setLevel(level=args.loglevel.upper())
     main()
