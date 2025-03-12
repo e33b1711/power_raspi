@@ -4,10 +4,8 @@ import git
 
 
 # logging stuff
-
 logger = logging.getLogger(__name__)
 logger.setLevel("INFO")
-
 
 def get_git_rev():
     """Return git version string"""

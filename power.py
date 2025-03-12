@@ -9,8 +9,9 @@ import math
 from lib.victron import read_victron, MAX_BATT_IN_POWER
 from lib.warp_charger import charger_on, charger_off, read_charger
 from lib.warp_charger import update_charger, init_charger, set_charger
-from lib.mqtt import mqtt_publish, mqtt_init, COMMAND_TOPICS, mqtt_stop, mqtt_publish_ard_command
+from lib.mqtt import mqtt_publish, mqtt_init, COMMAND_TOPICS, STATE_PREFIX, mqtt_stop, mqtt_publish_ard_command
 from lib.pwm_heating import get_heat_data, POWER_2_PWM, MAX_SETPOINT, MIN_SETPOINT
+from lib.git_revision import get_git_rev
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 INTERVAL = 5
 ON_VALS = ['ON', '1']
 OFF_VALS = ['OFF', '0']
+
+HEART_RATE = 60*5
+last_haert_beat = 0
+git_rev = get_git_rev()
 
 all_data = {
     # collected data
@@ -223,6 +228,15 @@ def kill_some_time():
     logger.debug("End of loop. %s", str(all_data['last_update']))
 
 
+def beat_heart():
+    """Send git rev message all n minutes."""
+    global last_haert_beat
+    if last_haert_beat + HEART_RATE < time.time():
+        logger.debug("Sending heart beat: %s", git_rev)
+        mqtt_publish({STATE_PREFIX + "power_service": git_rev})
+        last_haert_beat = time.time()
+
+
 def main():
     """Main loop and init"""
 
@@ -242,6 +256,7 @@ def main():
         charger_control()
         heat_control()
         mqtt_publish(all_data)
+
 
 
 if __name__ == "__main__":
