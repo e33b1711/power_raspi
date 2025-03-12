@@ -72,6 +72,7 @@ def broadcast(message, connection=None):
     if message == "":
         return
     for client in client_socks:
+        logger.debug("Relay: %s", str(client))
         if client != connection:
             try:
                 client.send(message)
@@ -79,6 +80,9 @@ def broadcast(message, connection=None):
                 logger.error("Caught Exception: %s", str(e))
                 client.close()
                 remove(client)
+        else:
+            logger.debug("Not relay: %s", str(client))
+
 
 
 def get_message(mess_buff):
