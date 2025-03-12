@@ -233,7 +233,7 @@ def beat_heart():
     global last_haert_beat
     if last_haert_beat + HEART_RATE < time.time():
         logger.debug("Sending heart beat: %s", git_rev)
-        mqtt_publish({STATE_PREFIX + "power_service": git_rev})
+        mqtt_publish({"power_service": git_rev})
         last_haert_beat = time.time()
 
 
@@ -248,7 +248,7 @@ def main():
     logger.info("Init done.")
 
     while True:
-
+        beat_heart()
         kill_some_time()
         get_victron()
         get_charger()
