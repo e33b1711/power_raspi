@@ -1,11 +1,7 @@
 ( ) start / restart behavior power service (no dhcp / no mqtt)
-( ) start / restart behavior relay (no dhcp / no mqtt)
+(x) start / restart behavior relay (no dhcp / no mqtt)
 (x) power: heat => go over mqtt
-( ) relay: commands are echoed back to the arduino nodes (especially bad with toggle)
-( ) revision hardbeat / power service
-( ) revision hardbeat / relay
+(x) relay: commands are echoed back to the arduino nodes (especially bad with toggle) not anymore
+(x) revision hardbeat / power service
+(x) revision hardbeat / relay
 
-
-seperate relay / tcp echo relay_server
-1st verbose server + mqtt relay service
-2nd verbose mode switch
