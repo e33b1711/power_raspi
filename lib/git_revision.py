@@ -12,8 +12,8 @@ def get_git_rev():
     repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha
     if repo.is_dirty():
-        rev_string = "dirty_" + sha[0:7]
+        rev_string = "dirty_" + sha[0:8]
     else:
-        rev_string = sha[0:7]
+        rev_string = sha[0:8]
     logger.info("Git rev string: %s", rev_string)
     return rev_string

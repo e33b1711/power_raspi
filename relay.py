@@ -12,7 +12,7 @@ from lib.git_revision import get_git_rev
 
 # global stuff
 end_threads = False
-HEART_RATE = 60*5
+HEART_RATE = 60
 last_haert_beat = 0
 git_rev = get_git_rev()
 
@@ -72,9 +72,9 @@ def relay(message, connection, port):
     for client in clients:
 
         #TOD make me better
-        try:
+        if isinstance(client, socket.socket):
             client_port = client.getsockname()[1]
-        except:
+        else:
             client_port = 0
 
         if client != connection and client_port == port:

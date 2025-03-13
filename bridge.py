@@ -1,19 +1,18 @@
 """TCP relay ser"""
 import socket
-import threading
 import argparse
 import logging
 import signal
 import re
 import time
-from lib.mqtt import mqtt_publish_ard_state, mqtt_init, mqtt_stop, ARD_STATE_PREFIX
+from lib.mqtt import mqtt_publish_ard_state, mqtt_init, mqtt_stop
 from lib.get_ip import get_ip
 from lib.git_revision import get_git_rev
 
 
 # global stuff
 end_threads = False
-HEART_RATE = 60*5
+HEART_RATE = 60
 last_haert_beat = 0
 git_rev = get_git_rev()
 
@@ -43,7 +42,7 @@ def send_mqtt(messages):
         if not message.count('!') == 3:
             logger.warning("Defective ECHO message: >>%s<<", message)
             continue
-        logger.info("Incoming on ECHO: %s", message)
+        logger.debug("Incoming on ECHO: %s", message)
         logger.debug("message.split(!): %s", str(message.split("!")))
         _, message_type, topic, payload = message.replace('$', '').split("!")
 
@@ -64,7 +63,7 @@ def init_socket(ip_address, port):
 def on_message(mqtt_client, userdata, message):
     """Incoming mqtt message callback."""
     payload = str(message.payload.decode("utf-8"))
-    logger.info("Incoming on MQTT: %s %s", message.topic, payload)
+    logger.debug("Incoming on MQTT: %s %s", message.topic, payload)
     topic = message.topic.split("/")
     if topic[0] == "ard_command":
         echo_message = f"!c!{topic[1]}!{payload}$\n"
@@ -83,14 +82,14 @@ def beat_heart():
     """Send git rev message all n minutes."""
     global last_haert_beat
     if last_haert_beat + HEART_RATE < time.time():
-        logger.debug("Sending heart beat: %s", git_rev)
+        logger.info("Sending heart beat: %s", git_rev)
         mqtt_publish_ard_state({"bridge_service": git_rev})
         last_haert_beat = time.time()
 
 
 def main_loop():
     """read socket. relay to mqtt."""
-    logger.info("Enter main loop")
+    logger.debug("Enter main loop")
     while not end_threads:
         try:
             data = client.recv(1024)
