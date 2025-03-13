@@ -72,10 +72,12 @@ def relay(message, connection, port):
     for client in clients:
 
         #TOD make me better
-        if isinstance(client, socket.socket):
+        try:
             client_port = client.getsockname()[1]
-        else:
-            client_port = 0
+        except Exception as e:
+            logger.error("Caugt exception: %s", str(e))
+            remove(client)
+            continue
 
         if client != connection and client_port == port:
             logger.debug("Relay: %s", str(client))
