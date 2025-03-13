@@ -63,6 +63,11 @@ def callback3(client, userdata, message):
     payload = str(message.payload.decode("utf-8"))
     print(payload)
 
+def on_disconnect_exit(arg_client, userdata, flags, reason_code, properties):
+    """MQTT dont recover."""
+    logger.warning("Disconnected with result code: %s", reason_code)
+    sys.exit(-1)
+
 
 def on_disconnect(arg_client, userdata, flags, reason_code, properties):
     """MQTT recoverer."""
@@ -86,7 +91,7 @@ def on_disconnect(arg_client, userdata, flags, reason_code, properties):
                  reconnect_count)
 
 
-def mqtt_init(topics, callbacks, broker=BROKER):
+def mqtt_init(topics, callbacks, reconnect=True, broker=BROKER):
     """Initialize the client"""
     try:
         client.connect(broker)
@@ -96,7 +101,10 @@ def mqtt_init(topics, callbacks, broker=BROKER):
         sys.exit(-1)
 
     client.on_message = callback0
-    client.on_disconnect = on_disconnect
+    if reconnect:
+        client.on_disconnect = on_disconnect
+    else:
+        client.on_disconnect = on_disconnect_exit
     for topic, callback in zip(topics, callbacks):
         client.subscribe(topic)
         client.message_callback_add(topic, callback)
