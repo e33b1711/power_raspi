@@ -91,6 +91,7 @@ def main_loop():
     """read socket. relay to mqtt."""
     logger.debug("Enter main loop")
     while not end_threads:
+        beat_heart()
         try:
             data = client.recv(1024)
         except socket.timeout:
