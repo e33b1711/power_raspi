@@ -1,4 +1,3 @@
-( ) start / restart behavior power service (no dhcp / no mqtt)
 (x) start / restart behavior relay (no dhcp / no mqtt)
 (x) power: heat => go over mqtt
 (x) relay: commands are echoed back to the arduino nodes (especially bad with toggle) not anymore
