@@ -34,7 +34,7 @@ def filter_messages(messages):
     logger.debug("Filter messages...")
     messages_out = ""
     for message in messages:
-        if message.startswith("!c!"):
+        if message.startswith("!c!") or message.startswith("!r!"):
             messages_out += message + "\n"
             logger.debug("Going through: %s", message)
         else:
